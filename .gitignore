@@ -1,0 +1,35 @@
+# Vim Swap files (anywhere)
+**/*.swp
+**/*.swo
+
+# Coverage file
+.coverage
+
+# Secrets (anywhere)
+**/Secret*.json
+**/secret*.json
+
+# sqllite (anywhere)
+**/*.sqlite3
+
+# Python caches (anywhere)
+**/__pycache__/
+**/*.pyc
+
+# Tox output
+.tox/
+htmlcov/
+
+# .log files
+**/*.log
+
+# Pycharm files
+.idea/*
+
+# Build and dist files
+build/
+dist/
+
+# Egg files
+**/*.egg
+**/*.egg-info
