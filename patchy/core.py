@@ -1,178 +1,167 @@
 """ Generic monkey patching functions for doing it (mostly) safely """
 
-import inspect
 import logging
-from types import MethodType
-from importlib import import_module, reload
+from types import MethodType, ModuleType, FunctionType
+from importlib import import_module
 from importlib.util import find_spec
-from contextlib import suppress, contextmanager
+from contextlib import suppress
 
 __all__ = ['patchy']
 
 logger = logging.getLogger(__name__)
 
 
-@contextmanager
-def patchy(patch_root=None, module_sep=None):
-    yield PatchBase(patch_root, module_sep)
+def patchy(target, source=None):
+    """ If source is not supplied, auto updates cannot be applied """
+    if isinstance(target, str):
+        target = resolve(target)
+    if isinstance(source, str):
+        source = resolve(source)
+    if isinstance(target, ModuleType):
+        return PatchModule(target, source)
+    elif isinstance(target, type) and source:
+        return PatchClass(target, source)
 
 
-def shadow():
-    frame = inspect.currentframe()
-    f_back = frame.f_back
-    try:
-        # do something with the frame
-    finally:
-        del frame
-        del f_back
+def resolve(path):
+    """ Turn a dotted name into a module or class reference """
+    with suppress(AttributeError, ModuleNotFoundError):
+        find_spec(path)
+        return import_module(path)
+    if path.find('.'):
+        mod_str, cls_str = path.rsplit('.', maxsplit=1)
+        mod = import_module(mod_str)
+        return getattr(mod, cls_str)
+    raise ValueError('Must be a valid class or module name')
+
+# inspect.getmembers includes values in mro
+# obj.__dict__ includes hidden attributes
+# obj.__dict__ returns wrapped objects
+# Use obj.__dict__ with getattr() to avoid mro and wrappings
+def get_attrs(obj, types, exclude_hidden=True):
+    """ Get the locally declared attributes of an object filtered by type """
+    attrs = ((k, getattr(obj, k)) for k in obj.__dict__ if not exclude_hidden or not k.startswith('_'))
+    return [k for k, v in attrs if isinstance(v, types)]
 
 
 class PatchBase:
-    patch_root = None
-    module_sep = '_'
-
-    def __init__(self, patch_root=None, module_sep=None):
-        if patch_root is not None:
-            try:
-                import_module(patch_root)
-                self.patch_root = patch_root
-            except ImportError:
-                raise ValueError("No module found at specified patch_root")
-        if module_sep is not None:
-            self.module_sep = module_sep
 
     def __enter__(self):
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_value, traceback):
         pass
 
-    def module(self, module, source_module=None):
-        return PatchModule(self, module, source_module)
+    def merge(self, *attrs, **kattrs):
+        for attr, value in kattrs:
+            if isinstance(value, dict):
+                getattr(self.target, attr).update(value)
+
+    def _auto(self, source, types):
+        attrs = get_attrs(source, types)
+        self.add(*attrs)
 
 
 class PatchModule(PatchBase):
+    def __init__(self, target, source=None, module_sep='_'):
+        self.target = target
+        self.source = source
+        self.module_sep = module_sep
 
-    def __init__(self, patcher, module, source_module=None):
-        self.from_patcher(patcher)
-        self.module = import_module(module)
-        if source_module:
-            self.source_module = source_module
-
-    def from_patcher(self, patcher):
-        self.patch_root = patcher.patch_root
-        self.module_sep = patcher.module_sep
-
-    def cls(self, cls, source_cls=None):
-        return PatchClass(self, cls, source_cls=source_cls)
-
-    @property
-    def source_module(self):
-        with suppress(AttributeError):
-            return self._source_module
-
-        self.source_module = self.module.__name__
-        return self._source_module
-
-    @source_module.setter
-    def source_module(self, source):
-        if inspect.ismodule(source):
-            self._source_module = source
-        elif isinstance(source, str):
-            if self.module_sep is not None:
-                source = source.replace('.', self.module_sep)
-            if self.patch_root is not None:
-                self._source_module = import_module('.' + source, package=self.patch_root)
+    def cls(self, target, source=None):
+        if isinstance(target, str):
+            if target.find('.'):
+                mod_str, target = target.rsplit('.', maxsplit=1)
+                mod = import_module('.' + mod_str, package=self.target.__name__)
             else:
-                self._source_module = import_module(source)
-        else:
-            raise TypeError("Must be a valid module or module name")
+                mod = self.target
+            target = getattr(mod, target)
+        if isinstance(source, str):
+            source = getattr(self.source, source)
+
+        if isinstance(target, type):
+            return PatchClass(target, source)
+        raise TypeError('Must be a valid class or class name')
+
+    def mod(self, target, source=None):
+        if isinstance(target, str):
+            target = import_module('.' + target, package=self.target.__name__)
+        if isinstance(source, str):
+            source = import_module('.' + source, package=self.source.__name__)
+        elif source is None:
+            #parent = import_module('..', package=self.source.__name__)
+            # Deal with nested modules in a pack
+            source_name = target.__name__.replace('.', self.module_sep)
+            source = import_module('..' + source, package=self.source.__name__)
+
+        if isinstance(target, ModuleType):
+            return PatchModule(target, source, self.module_sep)
 
     def add(self, *attrs, **kattrs):
         """ Add attributes or classes """
         if kattrs:
             logger.info("Patching {m} directly with attrs: {a}".format(
-                m=self.module.__name__,
+                m=self.target.__name__,
                 a=kattrs.keys()))
             for attr, value in kattrs:
-                setattr(self.module, attr, value)
+                setattr(self.target, attr, value)
         if attrs:
             logger.info("Patching {m} from {pm} with attrs: {a}".format(
-                m=self.module.__name__,
-                pm=self.source_module.__name__,
+                m=self.target.__name__,
+                pm=self.source.__name__,
                 a=attrs))
             for attr in attrs:
                 # Treat objects as assigned by their name
                 if hasattr(attr, "__name__"):
                     (attr, value) = (attr.__name__, attr)
                 else:
-                    value = getattr(self.module, attr)
-                setattr(self.module, attr, value)
+                    value = getattr(self.source, attr)
+                setattr(self.target, attr, value)
 
-    def auto(self, predicate=inspect.isclass):
-        self._auto(self.source_module, predicate)
-
-    def _auto(self, source, predicate):
-        attrs = [o[0] for o in inspect.getmembers(source, predicate)]
-        self.add(*attrs)
+    def auto(self, types=object):
+        self._auto(self.source, types)
 
 
-class PatchClass(PatchModule):
+class PatchClass(PatchBase):
+    def __init__(self, target, source):
+        self.target = target
+        self.source = source
 
-    def __init__(self, module, cls, source_cls=None):
-        self.from_module(module)
-        self.cls = getattr(self.module, cls)
-        if source_cls:
-            self.source_cls = source_cls
+    def mod(self):
+        return self.target.__module__
 
-    def from_module(self, module):
-        self.from_patcher(module)
-        with suppress(AttributeError):
-            self._source_module = module._source_module
-        self.module = module.module
-
-    @property
-    def source_cls(self):
-        with suppress(AttributeError):
-            return self._source_cls
-
-        self.source_cls = self.cls.__name__
-        return self._source_cls
-
-    @source_cls.setter
-    def source_cls(self, source):
-        if inspect.isclass(source):
-            self._source_cls = source
-        elif isinstance(source, str):
-            self._source_cls = getattr(self.source_module, source)
-        else:
-            raise TypeError("Must be a valid class or class name")
-
-    def auto(self, predicate=inspect.isfunction):
-        self._auto(self.source_cls, predicate)
+    def auto(self, types=object):
+        self._auto(self.source, types)
 
     def add(self, *attrs, **kattrs):
         """ Add attributes or classes """
         if kattrs:
             logger.info("Patching {m}.{c} directly with attrs: {a}".format(
-                m=self.module.__name__,
-                c=self.cls.__name__,
+                m=self.target.__module__,
+                c=self.target.__name__,
                 a=kattrs.keys()))
             for attr, value in kattrs:
-                setattr(self.cls, attr, value)
+                setattr(self.target, attr, value)
         for attr in attrs:
-            # Treat objects as assigned by their name
+            # Treat objects as assigned to their name
             if hasattr(attr, "__name__"):
                 (attr, value) = (attr.__name__, attr)
             else:
-                value = getattr(self.source_cls, attr)
+                value = getattr(self.source, attr)
+            old_val = getattr(self.target, attr, None)
             logger.debug(" {c}.{a} was {f1}, but will be {f2}{r}".format(
-                c=self.cls.__name__,
+                c=self.target.__name__,
                 a=attr,
-                f1=getattr(self.cls, attr) if hasattr(self.cls, attr) else "none",
+                f1=old_val,
                 f2=value,
-                r=" which will be rebound" if isinstance(value, MethodType) else ""))
+                r=" as a classmethod" if isinstance(value, MethodType) else ""))
             if isinstance(value, MethodType):
-                setattr(self.cls, attr, classmethod(value.__func__))
+                # Rebind if a classmethod and make old value available
+                setattr(value.__func__, '__patched__', old_val)
+                setattr(self.target, attr, classmethod(value.__func__))
+            elif isinstance(value, FunctionType):
+                # Make old value available, but will not be bound to instances if a function
+                setattr(value, '__patched__', old_val)
+                setattr(self.target, attr, value)
             else:
-                setattr(self.cls, attr, value)
+                setattr(self.target, attr, value)
