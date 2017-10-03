@@ -57,8 +57,8 @@ class PatchBase:
             if isinstance(value, dict):
                 getattr(self.target, attr).update(value)
 
-    def _auto(self, source, types):
-        attrs = get_attrs(source, types)
+    def auto(self, source=None, *, types=object):
+        attrs = get_attrs(source or self.source, types)
         self.add(*attrs)
 
 
@@ -118,9 +118,6 @@ class PatchModule(PatchBase):
                     value = getattr(self.source, attr)
                 setattr(self.target, attr, value)
 
-    def auto(self, types=object):
-        self._auto(self.source, types)
-
 
 class PatchClass(PatchBase):
     def __init__(self, target, source):
@@ -129,9 +126,6 @@ class PatchClass(PatchBase):
 
     def mod(self):
         return self.target.__module__
-
-    def auto(self, types=object):
-        self._auto(self.source, types)
 
     def add(self, *attrs, **kattrs):
         """ Add attributes or classes """
