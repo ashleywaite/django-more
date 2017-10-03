@@ -9,10 +9,10 @@ setup(
     long_description=open('README.md').read(),
     packages=[
         'patchy',
-        'django-more',
-        'django-more.storages',
-        'django-cte',
-        'django-enum'
+        'django_more',
+        'django_more.storages',
+        'django_cte',
+        'django_enum'
     ],
     install_requires=[
         'django'
