@@ -53,9 +53,13 @@ class PatchBase:
         pass
 
     def merge(self, *attrs, **kattrs):
+        for attr in attrs:
+            kattrs[attr] = getattr(self.source, attr)
         for attr, value in kattrs.items():
             if isinstance(value, dict):
                 getattr(self.target, attr).update(value)
+            if isinstance(value, list):
+                getattr(self.target, attr).extend(value)
 
     def auto(self, source=None, *, types=object):
         attrs = get_attrs(source or self.source, types)
