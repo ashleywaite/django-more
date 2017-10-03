@@ -53,7 +53,7 @@ class PatchBase:
         pass
 
     def merge(self, *attrs, **kattrs):
-        for attr, value in kattrs:
+        for attr, value in kattrs.items():
             if isinstance(value, dict):
                 getattr(self.target, attr).update(value)
 
@@ -103,7 +103,7 @@ class PatchModule(PatchBase):
             logger.info("Patching {m} directly with attrs: {a}".format(
                 m=self.target.__name__,
                 a=kattrs.keys()))
-            for attr, value in kattrs:
+            for attr, value in kattrs.items():
                 setattr(self.target, attr, value)
         if attrs:
             logger.info("Patching {m} from {pm} with attrs: {a}".format(
@@ -140,7 +140,7 @@ class PatchClass(PatchBase):
                 m=self.target.__module__,
                 c=self.target.__name__,
                 a=kattrs.keys()))
-            for attr, value in kattrs:
+            for attr, value in kattrs.items():
                 setattr(self.target, attr, value)
         for attr in attrs:
             # Treat objects as assigned to their name
