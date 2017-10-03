@@ -1,9 +1,8 @@
 
 from enum import Enum
-from contextlib import suppress, contextmanager
+from contextlib import suppress
 
 from django.db.migrations.operations.fields import Operation, FieldOperation, AlterField
-from patchy import quick_patchy
 
 """
     Use a symbol = value style as per Enum expectations.
@@ -12,63 +11,6 @@ from patchy import quick_patchy
     For readbility of the database values, the human readable values are used.
 
 """
-
-# Functions that apply patches if necessary
-def patch_state(state):
-    if hasattr(state, 'add_enum'):
-        # Do not patch
-        return False
-
-    state.enums = []
-    return True
-
-def patch_questioner(questioner):
-    if hasattr(questioner, 'ask_rename_enum'):
-        # Do not patch
-        return False
-
-    return True
-
-
-class MigrationAutodetector:
-
-    def detect_enums(self):
-        # Scan both state trees for enums
-        old_enum_types = set(db_type for db_type, e in from_state.db_types.items() if isinstance(e, Enum))
-        new_enum_types = set(db_type for db_type, e in to_state.db_types.items() if isinstance(e, Enum))
-
-        # Look for renamed enums
-        new_enum_sets = {k: set(em.value for em in self.to_state.db_types[k]) for k in new_enum_types - old_enum_types}
-        old_enum_sets = {k: set(em.value for em in self.from_state.db_types[k]) for k in old_enum_types - new_enum_types}
-        for db_type, enum_set in new_enum_sets.items():
-            for rem_db_type, rem_enum_set in old_enum_sets.items():
-                # Compare only the values
-                if enum_set == rem_enum_set:
-                    self.questioner.ask_rename_enum(db_type, rem_db_type):
-                        self.add_operation(
-                            RenameEnum(
-                                old_type=rem_db_type,
-                                new_type=db_type))
-                        old_enum_sets.remove(rem_db_type)
-                        new_enum_sets.remove(db_type)
-                    break
-
-        # Create new enums
-        for db_type, values in new_enum_sets.items():
-            self.add_operation(
-                CreateEnum(
-                    db_type=db_type,
-                    values=values))
-
-        # Remove old enums
-        for db_type in old_enum_sets:
-            self.add_operation(
-                RemoveEnum(
-                    db_type=db_type)
-
-        # TODO Detect modified enums
-
-
 
 
 class CreateEnum(Operation):
@@ -81,15 +23,16 @@ class CreateEnum(Operation):
         return 'Creates an enum type {}'.format("")
 
     def state_forwards(self, app_label, state):
-        enum = Enum(self.name, values)
-        state.add_type(self.db_type, enum)
+        enum = Enum(self.db_type, self.values)
+        state.add_type(self.db_type, enum, app_label=app_label)
 
     def database_forwards(self, app_label, schema_editor, from_state, to_state):
         if schema_editor.connection.features.requires_enum_declaration:
-            enum = to_state.db_types[db_type]
+            enum = to_state.db_types[self.db_type]
+            print('choices', ', '.join(['%s'] * len(self.values)))
             sql = schema_editor.sql_create_enum % {
                 'enum_type': self.db_type,
-                'choices': [','.join(['%s'] * len(self.values))]}
+                'choices': ', '.join(['%s'] * len(self.values))}
             schema_editor.execute(sql, tuple(v for v in self.values))
 
     def database_backwards(self, app_label, schema_editor, from_state, to_state):
@@ -130,7 +73,7 @@ class RenameEnum(Operation):
 
     def state_forwards(self, app_label, state):
         enum = state.db_types[self.old_db_type]
-        state.add_type(self.new_db_type, enum)
+        state.add_type(app_label, self.new_db_type, enum)
         state.remove_type(self.old_db_type)
         # Alter all fields using this enum
         for (model_app_label, model_name), model_state in state.models.items():
