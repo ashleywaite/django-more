@@ -103,23 +103,17 @@ class PatchModule(PatchBase):
 
     def add(self, *attrs, **kattrs):
         """ Add attributes or classes """
+        for attr in attrs:
+            # Treat objects as assigned by their name
+            if hasattr(attr, "__name__"):
+                kattrs[attr.__name__] = attr
+            else:
+                kattrs[attr] = getattr(self.source, attr)
         if kattrs:
-            logger.info("Patching {m} directly with attrs: {a}".format(
+            logger.info("Patching {m} with attrs: {a}".format(
                 m=self.target.__name__,
                 a=kattrs.keys()))
             for attr, value in kattrs.items():
-                setattr(self.target, attr, value)
-        if attrs:
-            logger.info("Patching {m} from {pm} with attrs: {a}".format(
-                m=self.target.__name__,
-                pm=self.source.__name__,
-                a=attrs))
-            for attr in attrs:
-                # Treat objects as assigned by their name
-                if hasattr(attr, "__name__"):
-                    (attr, value) = (attr.__name__, attr)
-                else:
-                    value = getattr(self.source, attr)
                 setattr(self.target, attr, value)
 
 
