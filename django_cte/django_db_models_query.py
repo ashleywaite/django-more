@@ -1,6 +1,6 @@
 import django
 from itertools import chain
-from django.db.models.expressions import CTERef
+from .django_db_models_expressions import CTERef
 from django.db.models import sql
 
 

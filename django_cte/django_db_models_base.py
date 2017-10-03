@@ -1,5 +1,5 @@
 
-from django.db.models.query import LiteralQuerySet
+from .django_db_models_query import LiteralQuerySet
 
 
 class Model:

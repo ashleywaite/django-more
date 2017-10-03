@@ -6,7 +6,6 @@ from functools import partial
 
 
 __all__ = [
-    'DeleteQuery', 'UpdateQuery', 'InsertQuery', 'AggregateQuery',
     'LiteralQuery', 'WithQuery', 'InsertReturningQuery', 'UpdateReturningQuery']
 
 
