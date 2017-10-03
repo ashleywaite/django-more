@@ -16,7 +16,8 @@ Extras for Django that do not require any patching and can be used directly.
 ## django_cte
 
 Patches Django to add CTE based functionality.
- * django_cte.patch_cte()
+
+_Placing django_cte into Django INSTALLED_APPS is all that's required to patch_
 
 
 ## django_enum
