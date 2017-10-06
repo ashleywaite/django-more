@@ -30,9 +30,7 @@ class EnumState:
 
 def enum_state(values, name=None, app_label=None):
     """ Create an EnumState representing the values or Enum """
-    print(type(values))
     if isinstance(values, type) and issubclass(values, Enum):
-        print('Making enum_state from', values, values.values() if hasattr(values, 'values') else '')
         if not name:
             name = values.__name__
         values = (em.value for em in values)
@@ -63,10 +61,6 @@ class EnumOperation(Operation):
         enum = state.db_types[db_type]
         for info in self.get_fields(state, db_type):
             info.field.enum = enum
-            print('Making EnumField {model}.{field} live with {values}'.format(
-                model=info.model_name,
-                field=info.field_name,
-                values=enum.values()))
             state.reload_model(info.model_app_label, info.model_name)
 
 
@@ -86,7 +80,6 @@ class CreateEnum(EnumOperation):
     def database_forwards(self, app_label, schema_editor, from_state, to_state):
         if schema_editor.connection.features.requires_enum_declaration:
             enum = to_state.db_types[self.db_type]
-            print('choices', ', '.join(['%s'] * len(self.values)))
             sql = schema_editor.sql_create_enum % {
                 'enum_type': self.db_type,
                 'values': ', '.join(['%s'] * len(enum))}
@@ -182,12 +175,7 @@ class AlterEnum(EnumOperation):
     def state_forwards(self, app_label, state):
         from_enum = state.db_types[self.db_type]
         to_enum = enum_state((from_enum.values_set() | self.add_values) - self.remove_values, name=self.db_type, app_label=app_label)
-        print('Altering enum',
-            from_enum.__name__, from_enum.values_set(),
-            'to', to_enum.__name__, to_enum.values_set())
-
         state.add_type(self.db_type, to_enum)
-
 
     def database_forwards(self, app_label, schema_editor, from_state, to_state):
         # Compare from_state and to_state and generate the appropriate ALTER commands

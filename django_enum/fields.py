@@ -14,7 +14,6 @@ class DBType(str):
     db_type = None
 
     def __new__(cls, value, params=None, *args, **kwargs):
-        print("Making DBType {} with params {}".format(value, params))
         if not params:
             return super().__new__(cls, value)
         self = super().__new__(cls, cls.render(value, params))
