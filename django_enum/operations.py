@@ -32,8 +32,8 @@ class CreateEnum(Operation):
             print('choices', ', '.join(['%s'] * len(self.values)))
             sql = schema_editor.sql_create_enum % {
                 'enum_type': self.db_type,
-                'choices': ', '.join(['%s'] * len(self.values))}
             schema_editor.execute(sql, tuple(v for v in self.values))
+                'values': ', '.join(['%s'] * len(enum))}
 
     def database_backwards(self, app_label, schema_editor, from_state, to_state):
         if schema_editor.connection.features.requires_enum_declaration:
@@ -61,8 +61,8 @@ class RemoveEnum(Operation):
             enum = to_state.db_types[self.db_type]
             sql = schema_editor.sql_create_enum % {
                 'enum_type': self.db_type,
-                'choices': [','.join(['%s'] * len(enum))]}
             schema_editor.execute(sql, tuple(em.value for em in enum))
+                'values': ', '.join(['%s'] * len(enum))}
 
 
 class RenameEnum(Operation):

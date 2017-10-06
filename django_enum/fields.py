@@ -7,6 +7,30 @@ from contextlib import suppress
 
 __all__ = ['EnumField']
 
+
+class DBType(str):
+    """ Create a db_type string that can represent paramatised values """
+    params = []
+    db_type = None
+
+    def __new__(cls, value, params=None, *args, **kwargs):
+        print("Making DBType {} with params {}".format(value, params))
+        if not params:
+            return super().__new__(cls, value)
+        self = super().__new__(cls, cls.render(value, params))
+        self.db_type = value
+        self.params = params
+        return self
+
+    @property
+    def paramatized(self):
+        return self.db_type or self, params
+
+    @staticmethod
+    def render(db_type, params):
+        return db_type % tuple(params)
+
+
 class EnumField(models.Field):
     description = 'Enumeration field using python PEP435 and database implementations'
     case_sensitive = None
@@ -77,10 +101,17 @@ class EnumField(models.Field):
     # db_type method not needed if parameters set
     def db_type_parameters(self, connection):
         paras = super().db_type_parameters(connection)
-        # If connection type with enum type declarations
-        if connection.features.requires_enum_declaration:
-            paras.update(enum_type=self.enum_type)
-        else:
-            paras.update(choices=','.join(
-                "'{}'".format(c) for c in self.get_choices()))
+        if connection.features.has_enum:
+            paras['enum_type'] = self.enum_type
+            paras['values'] = ', '.join('%s' * len(self.get_choices()))
         return paras
+
+    def db_type(self, connection):
+        type_string = super().db_type(connection)
+        choices = None
+        if connection.features.has_enum and not connection.features.requires_enum_declaration:
+            choices = self.get_choices()
+
+        return DBType(
+            type_string,
+            choices)

@@ -59,13 +59,30 @@ class MysqlDatabaseFeatures:
 class PostgresDatabaseSchemaEditor:
     # CREATE TYPE enum_name AS ENUM ('value 1', 'value 2')
     # https://www.postgresql.org/docs/9.1/static/datatype-enum.html
-    sql_create_enum = 'CREATE TYPE %(enum_type)s AS ENUM (%(choices)s)'
+    sql_create_enum = 'CREATE TYPE %(enum_type)s AS ENUM (%(values)s)'
     sql_delete_enum = 'DROP TYPE %(enum_type)s'
     # ALTER TYPE for schema changes. pg9.1+ only
     # https://www.postgresql.org/docs/9.1/static/sql-altertype.html
     sql_alter_enum = 'ALTER TYPE %(enum_type)s ADD VALUE %(value)s %(condition)s'
     sql_rename_enum = 'ALTER TYPE %(old_type)s RENAME TO %(enum_type)s'
     # remove_from_enum is not supported by poostgres
+
+class BaseDatabaseSchemaEditor:
+    def _alter_column_type_sql(self, model, old_field, new_field, new_type):
+        """ Test for a parametised type and treat appropriately """
+        if hasattr(new_type, 'parametized'):
+            new_type, params = new_type.parametized
+        else:
+            params = []
+        return (
+            (
+                self.sql_alter_column_type % {
+                    "column": self.quote_name(new_field.column),
+                    "type": new_type,
+                },
+                params,
+            )
+        )
 
 
 class MigrationAutodetector:
@@ -135,7 +152,11 @@ def patch_enum():
 
     # Patch backend features
     with patchy('django.db.backends') as p:
+        # Add base changes necessary
         p.cls('base.features.BaseDatabaseFeatures', BaseDatabaseFeatures).auto()
+        with p.cls('base.schema.BaseDatabaseSchemaEditor', BaseDatabaseSchemaEditor) as c:
+            c.auto()
+            c.add('_alter_column_type_sql')
 
         # Only patch database backends in use (avoid dependencies)
         if 'django.db.backends.postgresql' in sys.modules:
@@ -145,4 +166,4 @@ def patch_enum():
 
         if 'django.db.backends.mysql' in sys.modules:
             p.cls('mysql.features.DatabaseFeatures', MysqlDatabaseFeatures).auto()
-            p.cls('mysql.base.DatabaseWrapper').merge(data_types={'EnumField': 'enum(%(choices)s))'})
+            p.cls('mysql.base.DatabaseWrapper').merge(data_types={'EnumField': 'enum(%(values)s))'})
