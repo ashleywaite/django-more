@@ -1,7 +1,11 @@
 
 from enum import Enum
 from contextlib import suppress
+from collections import namedtuple
 
+from django.db import IntegrityError
+from django.db import models
+from django.db.models.deletion import Collector
 from django.db.migrations.operations.fields import Operation, FieldOperation, AlterField
 
 from django_enum.fields import EnumField
@@ -53,6 +57,17 @@ def enum_fields(state, db_type=None, field_type=EnumField):
 
 class EnumOperation(Operation):
     get_fields = staticmethod(enum_fields)
+
+    def make_live(self, state, db_type):
+        # Update field states with live enum
+        enum = state.db_types[db_type]
+        for info in self.get_fields(state, db_type):
+            info.field.enum = enum
+            print('Making EnumField {model}.{field} live with {values}'.format(
+                model=info.model_name,
+                field=info.field_name,
+                values=enum.values()))
+            state.reload_model(info.model_app_label, info.model_name)
 
 
 class CreateEnum(EnumOperation):
@@ -157,17 +172,179 @@ class RenameEnum(EnumOperation):
         self.old_db_type, self.new_db_type = self.new_db_type, self.old_db_type
 
 
-class AlterEnum(AlterField):
+class AlterEnum(EnumOperation):
+    temp_db_type = 'django_enum_temp'
+    transition_db_type = 'django_enum_transition'
+
+    def __init__(self, db_type, add_values=None, remove_values=None, on_delete=models.PROTECT):
+        self.db_type = db_type
+        self.add_values = set(add_values)
+        self.remove_values = set(remove_values)
+        self.on_delete = on_delete
+
+    def describe(self):
+        return 'Alter enum type {db_type},{added}{removed}'.format(
+            db_type=self.db_type,
+            added=' added {} value(s)'.format(len(self.add_values)) if self.add_values else '',
+            removed=' removed {} value(s)'.format(len(self.remove_values)) if self.remove_values else '')
 
     def state_forwards(self, app_label, state):
-        enum = state.db_types[old_db_type]
-        state.add_type(new_db_type, enum)
-        state.remove_type(old_db_type)
+        from_enum = state.db_types[self.db_type]
+        to_enum = enum_state((from_enum.values_set() | self.add_values) - self.remove_values, name=self.db_type, app_label=app_label)
+        print('Altering enum',
+            from_enum.__name__, from_enum.values_set(),
+            'to', to_enum.__name__, to_enum.values_set())
+
+        state.add_type(self.db_type, to_enum)
+
 
     def database_forwards(self, app_label, schema_editor, from_state, to_state):
         # Compare from_state and to_state and generate the appropriate ALTER commands
+        pre_actions = []
+        post_actions = []
 
-        pass
+        # Make sure ORM is ready for use
+        from_state.clear_delayed_apps_cache()
+        db_alias = schema_editor.connection.alias
+
+        # Update old field states with live enum
+        self.make_live(from_state, self.db_type)
+
+        # Get field/model list
+        fields = [
+            (model, field, self.on_delete or field.on_delete)
+            for info in self.get_fields(from_state, self.db_type)
+            for model in [from_state.apps.get_model(info.model_app_label, info.model_name)]
+            for field in [model._meta.get_field(info.field_name)]]
+
+        if self.remove_values:
+            # The first post delete actions are to finalise the field types
+            if schema_editor.connection.features.has_enum:
+                if schema_editor.connection.features.requires_enum_declaration:
+                    sql_alter_column_type = getattr(schema_editor,
+                        'sql_alter_column_type_using',
+                        schema_editor.sql_alter_column_type)
+                    for (model, field, on_delete) in fields:
+                        db_table = schema_editor.quote_name(model._meta.db_table)
+                        db_field = schema_editor.quote_name(field.column)
+                        sql = schema_editor.sql_alter_column % {
+                            'table': db_table,
+                            'changes': sql_alter_column_type % {
+                                'column': db_field,
+                                'type': self.temp_db_type,
+                                'old_type': self.db_type}}
+                        post_actions.append((sql, []))
+                else:
+                    for (model, field, on_delete) in fields:
+                        db_table = schema_editor.quote_name(model._meta.db_table)
+                        db_field = schema_editor.quote_name(field.column)
+                        sql = schema_editor.sql_alter_column % {
+                            'table': db_table,
+                            'changes': schema_editor.sql_alter_column_type % {
+                                'column': db_field,
+                                'type': field.db_type()}}
+                        post_actions.append((sql, []))
+
+            if self.add_values:
+                # If there's the possibility of inconsistent actions, use transition type
+                # ie, ADD VALUE 'new_val' and REMOVE VALUE 'rem_val' ON DELETE SET('new_val')
+                # On DB's without enum support this isn't necessary as they are always CHAR
+                transition_fields = [(model, field)
+                    for (model, field, on_delete) in fields
+                    if hasattr(on_delete, 'deconstruct')
+                        or (on_delete == models.SET_DEFAULT and field.get_default() in self.add_values)]
+
+                if transition_fields and schema_editor.connection.features.has_enum:
+                    transition_values = to_state.db_types[self.db_type].values_set() | self.remove_values
+                    transition_enum = enum_state(transition_values, 'transitional_enum')
+                    if schema_editor.connection.features.requires_enum_declaration:
+                        # Create transition type
+                        sql = schema_editor.sql_create_enum % {
+                            'enum_type': self.transition_db_type,
+                            'choices': ', '.join(['%s'] * len(transition_values))}
+                        pre_actions.append((sql, list(transition_values)))
+                        # Drop transition type after done
+                        sql = schema_editor.sql_delete_enum % {
+                            'enum_type': self.transition_db_type}
+                        post_actions.append((sql, []))
+
+                    # Set fields to transition type
+                    for (model, field) in transition_fields:
+                        db_table = schema_editor.quote_name(model._meta.db_table)
+                        db_field = schema_editor.quote_name(field.column)
+                        field.enum = transition_enum
+                        field.enum_type = self.transition_db_type
+                        sql = schema_editor.sql_alter_column % {
+                            'table': db_table,
+                            'changes': schema_editor.sql_alter_column_type % {
+                                'column': db_field,
+                                'type': field.db_type()}}
+                        pre_actions.append((sql, []))
+
+            # Create new type with temporary name
+            if schema_editor.connection.features.requires_enum_declaration:
+                to_enum = to_state.db_types[self.db_type]
+                sql = schema_editor.sql_create_enum % {
+                    'enum_type': self.temp_db_type,
+                    'values': ', '.join(['%s'] * len(to_enum))}
+                pre_actions.append((sql, to_enum.values()))
+
+            # Clean up original type and rename new one to replace it
+            if schema_editor.connection.features.requires_enum_declaration:
+                sql = schema_editor.sql_delete_enum % {
+                    'enum_type': self.db_type}
+                post_actions.append((sql, []))
+                sql = schema_editor.sql_rename_enum % {
+                    'old_type': self.temp_db_type,
+                    'enum_type': self.db_type}
+                post_actions.append((sql, []))
+        elif self.add_values:
+            # Just adding values? Directly modify types, no hassle!
+            if schema_editor.connection.features.requires_enum_declaration:
+                for value in self.add_values:
+                    sql = schema_editor.sql_alter_enum % {
+                        'enum_type': self.db_type,
+                        'value': '%s'}
+                    post_actions.append((sql, [value]))
+            elif schema_editor.connection.features.has_enum:
+                for (model, field, on_delete) in fields:
+                    db_table = schema_editor.quote_name(model._meta.db_table)
+                    db_field = schema_editor.quote_name(field.column)
+                    sql = schema_editor.sql_alter_column % {
+                        'table': db_table,
+                        'changes': schema_editor.sql_alter_column_type % {
+                            'column': db_field,
+                            'type' : field.db_type()}}
+                    post_actions.append((sql, []))
+
+        # Prepare database for data to be migrated
+        for sql, params in pre_actions:
+            schema_editor.execute(sql, params)
+
+        # Apply all on_delete actions making data consistent with to_state values
+        if self.remove_values:
+            # Records affected by on_delete action
+            on_delete_gen = ((
+                    field,
+                    model.objects.using(db_alias).filter(
+                        models.Q(('{}__in'.format(field.name), self.remove_values))
+                    ).only('pk'),
+                    on_delete)
+                for (model, field, on_delete) in fields)
+
+            # Validate on_delete constraints
+            collector = Collector(using=db_alias)
+            for (field, qs, on_delete) in on_delete_gen:
+                if qs:
+                    # Trigger the on_delete collection directly
+                    on_delete(collector, field, qs, db_alias)
+            collector.delete()
+
+        # Apply final changes
+        for sql, params in post_actions:
+            schema_editor.execute(sql, params)
+
+
 
     def database_backwards(self, app_label, schema_editor, from_state, to_state):
         pass

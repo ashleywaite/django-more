@@ -68,6 +68,10 @@ class EnumField(models.Field):
                 self.enum_type = '{al}_enum_{en}'.format(
                     al=self.enum_app,
                     en=self.enum.__qualname__.lower())
+
+        # Trickery that allows Django on_delete functionality to work
+        self.remote_field = self
+
         super().__init__(**kwargs)
 
     def deconstruct(self):

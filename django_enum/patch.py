@@ -3,6 +3,7 @@ from enum import Enum
 import logging
 # Framework imports
 import django
+from django.db import models
 # Project imports
 from patchy import patchy
 from .operations import CreateEnum, RemoveEnum, RenameEnum, AlterEnum, enum_state, enum_fields
@@ -32,7 +33,41 @@ class ProjectState:
 
 class MigrationQuestioner:
     def ask_rename_enum(self, old_enum_key, new_enum_key, enum_set):
-        return self.defaults.get("ask_rename_enum", False)
+        return self.defaults.get('ask_rename_enum', False)
+
+    def ask_remove_enum_values(self, db_type, values):
+        return self.defaults.get('ask_remove_enum_values', None)
+
+
+class InteractiveMigrationQuestioner:
+    def ask_rename_enum(self, old_enum_key, new_enum_key, enum_set):
+        return self._boolean_input(
+            'Did you rename enum {old_key} to {new_key}? [y/N]'.format(
+                old_key=old_enum_key,
+                new_key=new_enum_key),
+            default=False)
+
+    def ask_remove_enum_values(self, db_type, values):
+        """ How to treat records with deleted enum values. """
+        # Ordered ensures
+        choices = [
+            (models.CASCADE, "Cascade - Delete records with removed values"),
+            (models.PROTECT, "Protect - Block migrations if records contain removed values"),
+            (models.SET_NULL, "Set NULL - Set value to NULL"),
+            (models.SET_DEFAULT, "Set default - Set value to field default"),
+            (models.SET, "Set value - Provide a one off default now"),
+            (models.DO_NOTHING, "Do nothing - Consistency must be handled elsewhere"),
+            (None, "Leave it to field definitions")]
+        choice, _ = choices[self._choice_input(
+            "Enum {db_type} has had {values} removed, "
+            "existing records may need to be updated. "
+            "Override update behaviour or do nothing and follow field behaviour.".format(
+                db_type=db_type,
+                values=values),
+            [q for (k, q) in choices]) - 1]
+        if choice == models.SET:
+            return models.SET(self._ask_default())
+        return choice
 
 
 class BaseDatabaseFeatures:
@@ -64,6 +99,9 @@ class PostgresDatabaseSchemaEditor:
     sql_alter_enum = 'ALTER TYPE %(enum_type)s ADD VALUE %(value)s %(condition)s'
     sql_rename_enum = 'ALTER TYPE %(old_type)s RENAME TO %(enum_type)s'
     # remove_from_enum is not supported by poostgres
+
+    sql_alter_column_type_using = 'ALTER COLUMN %(column)s TYPE %(type)s USING (%(column)s::text::%(type)s)'
+
 
 class BaseDatabaseSchemaEditor:
     def _alter_column_type_sql(self, model, old_field, new_field, new_type):
@@ -101,7 +139,7 @@ class MigrationAutodetector:
             for rem_db_type, rem_enum_set in old_enum_sets.items():
                 # Compare only the values
                 if enum_set == rem_enum_set:
-                    if self.questioner.ask_rename_enum(db_type, rem_db_type):
+                    if self.questioner.ask_rename_enum(db_type, rem_db_type, enum_set):
                         self.add_operation(
                             self.to_state.db_types[db_type].Meta.app_label,
                             RenameEnum(
@@ -126,7 +164,24 @@ class MigrationAutodetector:
                 RemoveEnum(
                     db_type=db_type))
 
-        # TODO Detect modified enums
+        # Does not detect renamed values in enum, that's a remove + add
+        existing_enum_sets = {k: (
+            self.from_state.db_types[k].values_set(),
+            self.to_state.db_types[k].values_set())
+            for k in from_enum_types & to_enum_types}
+        for db_type, (old_set, new_set) in existing_enum_sets.items():
+            if old_set != new_set:
+                paras = {'db_type': db_type}
+                removed = list(old_set - new_set)
+                added = list(new_set - old_set)
+                if removed:
+                    paras['remove_values'] = removed
+                    paras['on_delete'] = self.questioner.ask_remove_enum_values(db_type, removed)
+                if added:
+                    paras['add_values'] = added
+                self.add_operation(
+                    self.from_state.db_types[db_type].Meta.app_label,
+                    AlterEnum(**paras))
 
     # Must do before models, so inject detect_enums via here
     def generate_created_models(self):
@@ -144,6 +199,7 @@ def patch_enum():
             c.add('__init__')
         # ask_rename_enum
         p.cls('questioner.MigrationQuestioner', MigrationQuestioner).auto()
+        p.cls('questioner.InteractiveMigrationQuestioner', InteractiveMigrationQuestioner).auto()
         # detect_enums
         p.cls('autodetector.MigrationAutodetector', MigrationAutodetector).auto()
 
