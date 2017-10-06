@@ -34,47 +34,69 @@ class EnumField(models.Field):
     description = 'Enumeration field using python PEP435 and database implementations'
     case_sensitive = None
     enum_type = None
-    enum = None
+    _enum = None
     enum_app = None
+    manual_choices = False
 
     def __init__(self, enum=None, enum_type=None, case_sensitive=None, **kwargs):
+        super().__init__(**kwargs)
+        if kwargs.get('choices', False):
+            self.manual_choices = True
+        if enum:
+            self.enum = enum
+        if enum_type:
+            self.enum_type = enum_type
         if case_sensitive is not None:
             self.case_sensitive = case_sensitive
+        # Trickery that allows Django on_delete functionality to work
+        self.remote_field = self
 
+    @property
+    def enum(self):
+        return self._enum
+
+    @enum.setter
+    def enum(self, enum):
         if isinstance(enum, str):
-            with suppress(ImportError):
-                self.enum = import_string(enum)
-        else:
-            self.enum = enum
+            enum = import_string(enum)
 
-        if self.enum:
+        # Import meta options from enum
+        if 'Meta' in enum:
+            if 'db_type' in enum.Meta:
+                self.enum_type = enum.Meta.db_type
+            if 'app_label' in enum.Meta:
+                self.enum_app = enum.Meta.app_label
+
+        if not self.enum_app:
             # Determine app_label of enum being used
-            app_config = apps.get_containing_app_config(self.enum.__module__)
+            app_config = apps.get_containing_app_config(enum.__module__)
             if app_config is None:
                 raise RuntimeError(
                     "Enum class doesn't declare an explicit app_label, and isn't"
                     " in an application in INSTALLED_APPS")
             self.enum_app = app_config.label
 
-        # Respect the db_type declared on the enum, else generate
-        if enum_type:
-            self.enum_type = enum_type
+        # Generated enum_type
+        if not self.enum_type:
+            self.enum_type = '{al}_enum_{en}'.format(
+                al=self.enum_app,
+                en=enum.__qualname__.lower())
+
+        # Allow enum members as choices
+        if self.manual_choices:
+            self.choices = [
+                (choice.name, choice.value) if isinstance(choice, enum) else choice
+                for choice in self.choices]
         else:
-            if 'Meta' in self.enum and 'db_type' in self.enum.Meta:
-                self.enum_type = self.enum.Meta.db_type
-            else:
-                self.enum_type = '{al}_enum_{en}'.format(
-                    al=self.enum_app,
-                    en=self.enum.__qualname__.lower())
+            self.choices = [(em.name, em.value) for em in enum]
 
-        # Trickery that allows Django on_delete functionality to work
-        self.remote_field = self
-
-        super().__init__(**kwargs)
+        self._enum = enum
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
         kwargs['enum_type'] = self.enum_type
+        if not self.manual_choices and 'choices' in kwargs:
+            del kwargs['choices']
         if self.case_sensitive is not None:
             kwargs['case_sensitive'] = self.case_sensitive
         return name, path, args, kwargs
@@ -98,7 +120,7 @@ class EnumField(models.Field):
             return value
         with suppress(ValueError):
             # Key miss suppressed with .get()
-            return self.enum.__members__.get(value) or self.enum(value)
+            return self.enum(str(value))
         # Enum match failed, if not case_sensitive, try insensitive scan
         if self.case_sensitive is False:
             for em in self.enum:
@@ -114,22 +136,24 @@ class EnumField(models.Field):
         return value.value
 
     def get_choices(self, include_blank=True, blank_choice=BLANK_CHOICE_DASH, limit_choices_to=None):
-        return [e.value for e in self.enum]
+        if self.choices is True:
+            return [(em.name, em.value) for em in self.enum]
+        return super().get_choices(include_blank, blank_choice, limit_choices_to)
 
     # db_type method not needed if parameters set
     def db_type_parameters(self, connection):
         paras = super().db_type_parameters(connection)
         if connection.features.has_enum:
             paras['enum_type'] = self.enum_type
-            paras['values'] = ', '.join('%s' * len(self.get_choices()))
+            paras['values'] = ', '.join('%s' * len(self.enum))
         return paras
 
     def db_type(self, connection):
         type_string = super().db_type(connection)
-        choices = None
+        values = None
         if connection.features.has_enum and not connection.features.requires_enum_declaration:
-            choices = self.get_choices()
+            values = [em.value for em in self.enum]
 
         return DBType(
             type_string,
-            choices)
+            values)
