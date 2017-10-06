@@ -38,7 +38,6 @@ class EnumField(models.Field):
     enum_app = None
 
     def __init__(self, enum=None, enum_type=None, case_sensitive=None, **kwargs):
-        # TODO Add case insensitive enum
         if case_sensitive is not None:
             self.case_sensitive = case_sensitive
 
@@ -100,6 +99,11 @@ class EnumField(models.Field):
         with suppress(ValueError):
             # Key miss suppressed with .get()
             return self.enum.__members__.get(value) or self.enum(value)
+        # Enum match failed, if not case_sensitive, try insensitive scan
+        if self.case_sensitive is False:
+            for em in self.enum:
+                if str(value).lower() == em.value.lower():
+                    return em
         raise ValidationError('Invalid enumeration value')
 
     def get_prep_value(self, value):
