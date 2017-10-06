@@ -189,6 +189,14 @@ class MigrationAutodetector:
         self.generate_created_models.__patched__(self)
 
 
+class PostgresDatabaseWrapper:
+    data_types = {'EnumField': '%(enum_type)s'}
+
+
+class MysqlDatabaseWrapper:
+    data_types = {'EnumField': 'enum(%(values)s)'}
+
+
 def patch_enum():
     # Patch migrations classes
     logger.info('Applying django_enum patches')
@@ -215,8 +223,8 @@ def patch_enum():
         if 'django.db.backends.postgresql' in sys.modules:
             p.cls('postgresql.features.DatabaseFeatures', PostgresDatabaseFeatures).auto()
             p.cls('postgresql.schema.DatabaseSchemaEditor', PostgresDatabaseSchemaEditor).auto()
-            p.cls('postgresql.base.DatabaseWrapper').merge(data_types={'EnumField': '%(enum_type)s'})
+            p.cls('postgresql.base.DatabaseWrapper', PostgresDatabaseWrapper).merge('data_types')
 
         if 'django.db.backends.mysql' in sys.modules:
             p.cls('mysql.features.DatabaseFeatures', MysqlDatabaseFeatures).auto()
-            p.cls('mysql.base.DatabaseWrapper').merge(data_types={'EnumField': 'enum(%(values)s))'})
+            p.cls('mysql.base.DatabaseWrapper', MysqlDatabaseWrapper).merge('data_types')
