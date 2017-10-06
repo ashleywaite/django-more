@@ -35,25 +35,30 @@ class EnumField(models.Field):
     description = 'Enumeration field using python PEP435 and database implementations'
     case_sensitive = None
     enum_type = None
+    enum = None
+    enum_app = None
 
-    def __init__(self, enum, enum_type=None, case_sensitive=None, **kwargs):
+    def __init__(self, enum=None, enum_type=None, case_sensitive=None, **kwargs):
         # TODO Add case insensitive enum
         if case_sensitive is not None:
             self.case_sensitive = case_sensitive
 
         if isinstance(enum, str):
-            # Used for migrations only. Cannot specify enum by lazy class name
-            self.enum = import_string(enum)
+            with suppress(ImportError):
+                self.enum = import_string(enum)
         else:
             self.enum = enum
 
-        app_config = apps.get_containing_app_config(self.enum.__module__)
-        if app_config is None:
-            raise RuntimeError(
-                "Enum class doesn't declare an explicit app_label, and isn't"
-                " in an application in INSTALLED_APPS")
-        self.enum_app = app_config.label
+        if self.enum:
+            # Determine app_label of enum being used
+            app_config = apps.get_containing_app_config(self.enum.__module__)
+            if app_config is None:
+                raise RuntimeError(
+                    "Enum class doesn't declare an explicit app_label, and isn't"
+                    " in an application in INSTALLED_APPS")
+            self.enum_app = app_config.label
 
+        # Respect the db_type declared on the enum, else generate
         if enum_type:
             self.enum_type = enum_type
         else:
@@ -67,11 +72,17 @@ class EnumField(models.Field):
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
-        kwargs['enum'] = '{}.{}'.format(self.enum.__module__, self.enum.__name__)
         kwargs['enum_type'] = self.enum_type
         if self.case_sensitive is not None:
             kwargs['case_sensitive'] = self.case_sensitive
         return name, path, args, kwargs
+
+    def clone(self):
+        # Override deconstruct behaviour to include live enum
+        obj = super().clone()
+        if self.enum:
+            obj.enum = self.enum
+        return obj
 
     def from_db_value(self, value, expression, connection, context):
         if value is None:
