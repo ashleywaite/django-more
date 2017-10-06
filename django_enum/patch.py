@@ -87,18 +87,17 @@ class MigrationAutodetector:
 
     def detect_enums(self):
         # Scan to_state new enums in use
-        for (model_app_label, model_name), model_state in self.to_state.models.items():
-            for index, (name, field) in enumerate(model_state.fields):
-                if isinstance(field, EnumField) and field.enum_type not in self.to_state.db_types:
-                    self.to_state.add_type(field.enum_type, field.enum, app_label=field.enum_app)
+        for info in enum_fields(self.to_state):
+            if info.field.enum_type not in self.to_state.db_types:
+                self.to_state.add_type(info.field.enum_type, enum_state(info.field.enum, app_label=info.field.enum_app))
 
-        old_enum_types = set(db_type for db_type, e in self.from_state.db_types.items() if issubclass(e, Enum))
-        new_enum_types = set(db_type for db_type, e in self.to_state.db_types.items() if issubclass(e, Enum))
+        from_enum_types = set(db_type for db_type, e in self.from_state.db_types.items() if issubclass(e, Enum))
+        to_enum_types = set(db_type for db_type, e in self.to_state.db_types.items() if issubclass(e, Enum))
 
         # Look for renamed enums
-        new_enum_sets = {k: set(em.value for em in self.to_state.db_types[k]) for k in new_enum_types - old_enum_types}
-        old_enum_sets = {k: set(em.value for em in self.from_state.db_types[k]) for k in old_enum_types - new_enum_types}
-        for db_type, enum_set in new_enum_sets.items():
+        new_enum_sets = {k: self.to_state.db_types[k].values_set() for k in to_enum_types - from_enum_types}
+        old_enum_sets = {k: self.from_state.db_types[k].values_set() for k in from_enum_types - to_enum_types}
+        for db_type, enum_set in list(new_enum_sets.items()):
             for rem_db_type, rem_enum_set in old_enum_sets.items():
                 # Compare only the values
                 if enum_set == rem_enum_set:
@@ -108,8 +107,8 @@ class MigrationAutodetector:
                             RenameEnum(
                                 old_type=rem_db_type,
                                 new_type=db_type))
-                        old_enum_sets.remove(rem_db_type)
-                        new_enum_sets.remove(db_type)
+                        del old_enum_sets[rem_db_type]
+                        del new_enum_sets[db_type]
                     break
 
         # Create new enums

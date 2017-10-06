@@ -4,6 +4,8 @@ from contextlib import suppress
 
 from django.db.migrations.operations.fields import Operation, FieldOperation, AlterField
 
+from django_enum.fields import EnumField
+
 """
     Use a symbol = value style as per Enum expectations.
     Where a value is the human readable or sensible value, and the symbol is the
@@ -12,7 +14,6 @@ from django.db.migrations.operations.fields import Operation, FieldOperation, Al
 """
 
 
-class CreateEnum(Operation):
 class EnumState:
     @classmethod
     def values(cls):
@@ -37,6 +38,24 @@ def enum_state(values, name=None, app_label=None):
     e.Meta = type('Meta', (object,), {})
     e.Meta.app_label = app_label
     return e
+
+
+field_info = namedtuple('fielddetail', ['model_state', 'model_app_label', 'model_name', 'field', 'field_name', 'field_index'])
+def enum_fields(state, db_type=None, field_type=EnumField):
+    # Scan state for enums in use
+    return (
+        field_info(model_state, model_app_label, model_name, field, field_name, field_index)
+        for (model_app_label, model_name), model_state in state.models.items()
+        for field_index, (field_name, field) in enumerate(model_state.fields)
+        if isinstance(field, field_type)
+            and (field.enum_type == db_type or not db_type))
+
+
+class EnumOperation(Operation):
+    get_fields = staticmethod(enum_fields)
+
+
+class CreateEnum(EnumOperation):
     def __init__(self, db_type, values):
         # Values follow Enum functional API options to specify
         self.db_type = db_type
@@ -65,7 +84,7 @@ def enum_state(values, name=None, app_label=None):
             schema_editor.execute(sql)
 
 
-class RemoveEnum(Operation):
+class RemoveEnum(EnumOperation):
     def __init__(self, db_type):
         self.db_type = db_type
 
@@ -91,7 +110,7 @@ class RemoveEnum(Operation):
             schema_editor.execute(sql, enum.values())
 
 
-class RenameEnum(Operation):
+class RenameEnum(EnumOperation):
     def __init__(self, old_type, new_type):
         self.old_db_type = old_type
         self.db_type = new_type
@@ -108,13 +127,11 @@ class RenameEnum(Operation):
         state.add_type(self.db_type, enum)
 
         # Alter all fields using this enum
-        for (model_app_label, model_name), model_state in state.models.items():
-            for index, (name, field) in enumerate(model_state.fields):
-                if isinstance(field, EnumField) and field.enum_type == self.old_db_type:
-                    changed_field = field.clone()
-                    changed_field.enum_type = self.new_db_type
-                    model_state.fields[index] = name, changed_field
-                    self.fields.add((model_app_label, model_name, name))
+        for info in self.get_fields(state, self.old_db_type):
+            changed_field = info.field.clone()
+            changed_field.enum_type = self.db_type
+            info.model_state.fields[info.field_index] = (info.field_name, changed_field)
+            state.reload_model(info.model_app_label, info.model_name)
 
     def database_forwards(self, app_label, schema_editor, from_state, to_state):
         if schema_editor.connection.features.requires_enum_declaration:
@@ -123,7 +140,7 @@ class RenameEnum(Operation):
                 'enum_type': self.new_db_type}
             schema_editor.execute(sql)
             # Update fields referring to this enum
-            for (model_app_label, model_name, name) in self.fields:
+            for (model_app_label, model_name, field) in self.get_fields(to_state, self.new_db_type):
                 model = from_state.models[(model_app_label, model_name)]
                 schema_editor.sql_alter_column % {
                     'table': schema_editor.quote_name(model._meta.db_table),
