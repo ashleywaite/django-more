@@ -1,5 +1,6 @@
 import sys
 from enum import Enum
+import logging
 # Framework imports
 import django
 # Project imports
@@ -8,30 +9,26 @@ from .operations import CreateEnum, RemoveEnum, RenameEnum
 from .fields import EnumField
 
 
+logger = logging.getLogger(__name__)
+
 # Containers for patched methods added with patchy
 class ProjectState:
-    def init_types(self):
-        if not hasattr(self, 'db_types'):
-            self.db_types = {}
-        if not hasattr(self, 'db_types_apps'):
-            self.db_types_apps = {}
+    def __init__(self, *args, **kwargs):
+        self.__init__.__patched__(self, *args, **kwargs)
+        self.db_types = {}
 
     def add_type(self, db_type, type_state, app_label=None):
-        self.init_types()
         self.db_types[db_type] = type_state
         if app_label:
             self.db_types_apps[db_type] = app_label
 
     def remove_type(self, db_type):
-        if hasattr(self, 'db_types'):
-            del self.db_types[db_type]
+        del self.db_types[db_type]
 
     def clone(self):
         # Clone db_types state as well
         new_state = self.clone.__patched__(self)
-        if hasattr(self, 'db_types'):
-            new_state.db_types = self.db_types.copy()
-            new_state.db_types_apps = self.db_types_apps.copy()
+        new_state.db_types = self.db_types.copy()
         return new_state
 
 
@@ -74,10 +71,6 @@ class PostgresDatabaseSchemaEditor:
 class MigrationAutodetector:
 
     def detect_enums(self):
-        # Ensure types available
-        self.to_state.init_types()
-        self.from_state.init_types()
-
         # Scan to_state new enums in use
         for (model_app_label, model_name), model_state in self.to_state.models.items():
             for index, (name, field) in enumerate(model_state.fields):
@@ -129,9 +122,12 @@ class MigrationAutodetector:
 
 def patch_enum():
     # Patch migrations classes
+    logger.info('Applying django_enum patches')
     with patchy('django.db.migrations') as p:
         # add_type, remove_type, clone
-        p.cls('state.ProjectState', ProjectState).auto()
+        with p.cls('state.ProjectState', ProjectState) as c:
+            c.auto()
+            c.add('__init__')
         # ask_rename_enum
         p.cls('questioner.MigrationQuestioner', MigrationQuestioner).auto()
         # detect_enums
