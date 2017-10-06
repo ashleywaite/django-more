@@ -154,15 +154,6 @@ class RenameEnum(EnumOperation):
                 'old_type': self.old_db_type,
                 'enum_type': self.new_db_type}
             schema_editor.execute(sql)
-            # Update fields referring to this enum
-            for (model_app_label, model_name, field) in self.get_fields(to_state, self.new_db_type):
-                model = from_state.models[(model_app_label, model_name)]
-                schema_editor.sql_alter_column % {
-                    'table': schema_editor.quote_name(model._meta.db_table),
-                    'changes': schema_editor.sql_alter_column_type % {
-                        'column': schema_editor.quote_name(name),
-                        'type': self.new_db_type}}
-                schema_editor.execute(sql)
 
     def database_backwards(self, app_label, schema_editor, from_state, to_state):
         self.old_db_type, self.new_db_type = self.new_db_type, self.old_db_type
@@ -343,8 +334,6 @@ class AlterEnum(EnumOperation):
         # Apply final changes
         for sql, params in post_actions:
             schema_editor.execute(sql, params)
-
-
 
     def database_backwards(self, app_label, schema_editor, from_state, to_state):
         pass
