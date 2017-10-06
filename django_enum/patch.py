@@ -5,7 +5,7 @@ import logging
 import django
 # Project imports
 from patchy import patchy
-from .operations import CreateEnum, RemoveEnum, RenameEnum
+from .operations import CreateEnum, RemoveEnum, RenameEnum, AlterEnum, enum_state, enum_fields
 from .fields import EnumField
 
 
@@ -19,8 +19,6 @@ class ProjectState:
 
     def add_type(self, db_type, type_state, app_label=None):
         self.db_types[db_type] = type_state
-        if app_label:
-            self.db_types_apps[db_type] = app_label
 
     def remove_type(self, db_type):
         del self.db_types[db_type]
@@ -106,7 +104,7 @@ class MigrationAutodetector:
                 if enum_set == rem_enum_set:
                     if self.questioner.ask_rename_enum(db_type, rem_db_type):
                         self.add_operation(
-                            self.from_state.db_types_apps[db_type],
+                            self.to_state.db_types[db_type].Meta.app_label,
                             RenameEnum(
                                 old_type=rem_db_type,
                                 new_type=db_type))
@@ -117,7 +115,7 @@ class MigrationAutodetector:
         # Create new enums
         for db_type, values in new_enum_sets.items():
             self.add_operation(
-                self.to_state.db_types_apps[db_type],
+                self.to_state.db_types[db_type].Meta.app_label,
                 CreateEnum(
                     db_type=db_type,
                     values=list(values)))
@@ -125,7 +123,7 @@ class MigrationAutodetector:
         # Remove old enums
         for db_type in old_enum_sets:
             self.add_operation(
-                self.from_state.db_types_apps[db_type],
+                self.from_state.db_types[db_type].Meta.app_label,
                 RemoveEnum(
                     db_type=db_type))
 

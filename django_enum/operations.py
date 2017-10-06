@@ -9,22 +9,45 @@ from django.db.migrations.operations.fields import Operation, FieldOperation, Al
     Where a value is the human readable or sensible value, and the symbol is the
      constant or programming flag to use.
     For readbility of the database values, the human readable values are used.
-
 """
 
 
 class CreateEnum(Operation):
+class EnumState:
+    @classmethod
+    def values(cls):
+        return [em.value for em in cls]
+
+    @classmethod
+    def values_set(cls):
+        return set(cls.values())
+
+
+def enum_state(values, name=None, app_label=None):
+    """ Create an EnumState representing the values or Enum """
+    print(type(values))
+    if isinstance(values, type) and issubclass(values, Enum):
+        print('Making enum_state from', values, values.values() if hasattr(values, 'values') else '')
+        if not name:
+            name = values.__name__
+        values = (em.value for em in values)
+    elif not name:
+        name = 'Unnamed Enum'
+    e = Enum(name, [(v, v) for v in values], type=EnumState)
+    e.Meta = type('Meta', (object,), {})
+    e.Meta.app_label = app_label
+    return e
     def __init__(self, db_type, values):
         # Values follow Enum functional API options to specify
         self.db_type = db_type
         self.values = values
 
     def describe(self):
-        return 'Creates an enum type {}'.format("")
+        return 'Create enum type {db_type}'.format(db_type=self.db_type)
 
     def state_forwards(self, app_label, state):
-        enum = Enum(self.db_type, self.values)
-        state.add_type(self.db_type, enum, app_label=app_label)
+        enum = enum_state(self.values, name=self.db_type, app_label=app_label)
+        state.add_type(self.db_type, enum)
 
     def database_forwards(self, app_label, schema_editor, from_state, to_state):
         if schema_editor.connection.features.requires_enum_declaration:
@@ -32,8 +55,8 @@ class CreateEnum(Operation):
             print('choices', ', '.join(['%s'] * len(self.values)))
             sql = schema_editor.sql_create_enum % {
                 'enum_type': self.db_type,
-            schema_editor.execute(sql, tuple(v for v in self.values))
                 'values': ', '.join(['%s'] * len(enum))}
+            schema_editor.execute(sql, enum.values())
 
     def database_backwards(self, app_label, schema_editor, from_state, to_state):
         if schema_editor.connection.features.requires_enum_declaration:
@@ -45,6 +68,9 @@ class CreateEnum(Operation):
 class RemoveEnum(Operation):
     def __init__(self, db_type):
         self.db_type = db_type
+
+    def describe(self):
+        return 'Remove enum type {db_type}'.format(db_type=self.db_type)
 
     def state_forwards(self, app_label, state):
         # TODO Add dependency checking and cascades
@@ -61,20 +87,26 @@ class RemoveEnum(Operation):
             enum = to_state.db_types[self.db_type]
             sql = schema_editor.sql_create_enum % {
                 'enum_type': self.db_type,
-            schema_editor.execute(sql, tuple(em.value for em in enum))
                 'values': ', '.join(['%s'] * len(enum))}
+            schema_editor.execute(sql, enum.values())
 
 
 class RenameEnum(Operation):
-    def __init__(self, old_type, new_type, fields_dependent=None):
-        self.old_db_type = old_db_type
-        self.new_db_type = new_db_type
-        self.fields = fields_dependent or set()
+    def __init__(self, old_type, new_type):
+        self.old_db_type = old_type
+        self.db_type = new_type
+
+    def describe(self):
+        return 'Rename enum type {old} to {new}'.format(
+            old=self.old_db_type,
+            new=self.db_type)
 
     def state_forwards(self, app_label, state):
-        enum = state.db_types[self.old_db_type]
-        state.add_type(app_label, self.new_db_type, enum)
+        old_enum = state.db_types[self.old_db_type]
+        enum = enum_state(old_enum, name=self.db_type, app_label=app_label)
         state.remove_type(self.old_db_type)
+        state.add_type(self.db_type, enum)
+
         # Alter all fields using this enum
         for (model_app_label, model_name), model_state in state.models.items():
             for index, (name, field) in enumerate(model_state.fields):
