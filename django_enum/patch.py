@@ -155,14 +155,6 @@ class MigrationAutodetector:
         self.generate_created_models.__patched__(self)
 
 
-class PostgresDatabaseWrapper:
-    data_types = {'EnumField': '%(enum_type)s'}
-
-
-class MysqlDatabaseWrapper:
-    data_types = {'EnumField': 'enum(%(values)s)'}
-
-
 def patch_enum():
     # Patch migrations classes
     logger.info('Applying django_enum patches')
