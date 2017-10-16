@@ -8,7 +8,8 @@ from django.db import models
 from django.db.models.deletion import Collector
 from django.db.migrations.operations.fields import Operation, FieldOperation, AlterField
 
-from django_enum.fields import EnumField
+from django_types import CustomTypeOperation
+from .fields import EnumField
 
 """
     Use a symbol = value style as per Enum expectations.
@@ -42,26 +43,11 @@ def enum_state(values, name=None, app_label=None):
     return e
 
 
-field_info = namedtuple('fielddetail', ['model_state', 'model_app_label', 'model_name', 'field', 'field_name', 'field_index'])
-def enum_fields(state, db_type=None, field_type=EnumField):
-    # Scan state for enums in use
-    return (
-        field_info(model_state, model_app_label, model_name, field, field_name, field_index)
-        for (model_app_label, model_name), model_state in state.models.items()
-        for field_index, (field_name, field) in enumerate(model_state.fields)
-        if isinstance(field, field_type)
-            and (field.enum_type == db_type or not db_type))
-
-
-class EnumOperation(Operation):
-    get_fields = staticmethod(enum_fields)
-
-    def make_live(self, state, db_type):
-        # Update field states with live enum
-        enum = state.db_types[db_type]
-        for info in self.get_fields(state, db_type):
-            info.field.enum = enum
-            state.reload_model(info.model_app_label, info.model_name)
+class EnumOperation(CustomTypeOperation):
+    # Override get fields to restrict to EnumFields
+    @staticmethod
+    def get_fields(state, db_type=None, field_type=EnumField):
+        return CustomTypeOperation.get_fields(state, db_type, field_type)
 
 
 class CreateEnum(EnumOperation):
@@ -137,7 +123,7 @@ class RenameEnum(EnumOperation):
         # Alter all fields using this enum
         for info in self.get_fields(state, self.old_db_type):
             changed_field = info.field.clone()
-            changed_field.enum_type = self.db_type
+            changed_field.type_name = self.db_type
             info.model_state.fields[info.field_index] = (info.field_name, changed_field)
             state.reload_model(info.model_app_label, info.model_name)
 

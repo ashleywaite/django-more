@@ -6,30 +6,14 @@ import django
 from django.db import models
 # Project imports
 from patchy import patchy
-from .operations import CreateEnum, RemoveEnum, RenameEnum, AlterEnum, enum_state, enum_fields
+from django_types import find_fields
+from .operations import CreateEnum, RemoveEnum, RenameEnum, AlterEnum, enum_state
 from .fields import EnumField
 
 
 logger = logging.getLogger(__name__)
 
 # Containers for patched methods added with patchy
-class ProjectState:
-    def __init__(self, *args, **kwargs):
-        self.__init__.__patched__(self, *args, **kwargs)
-        self.db_types = {}
-
-    def add_type(self, db_type, type_state, app_label=None):
-        self.db_types[db_type] = type_state
-
-    def remove_type(self, db_type):
-        del self.db_types[db_type]
-
-    def clone(self):
-        # Clone db_types state as well
-        new_state = self.clone.__patched__(self)
-        new_state.db_types = self.db_types.copy()
-        return new_state
-
 
 class MigrationQuestioner:
     def ask_rename_enum(self, old_enum_key, new_enum_key, enum_set):
@@ -103,31 +87,13 @@ class PostgresDatabaseSchemaEditor:
     sql_alter_column_type_using = 'ALTER COLUMN %(column)s TYPE %(type)s USING (%(column)s::text::%(type)s)'
 
 
-class BaseDatabaseSchemaEditor:
-    def _alter_column_type_sql(self, model, old_field, new_field, new_type):
-        """ Test for a parametised type and treat appropriately """
-        if hasattr(new_type, 'parametized'):
-            new_type, params = new_type.parametized
-        else:
-            params = []
-        return (
-            (
-                self.sql_alter_column_type % {
-                    "column": self.quote_name(new_field.column),
-                    "type": new_type,
-                },
-                params,
-            )
-        )
-
-
 class MigrationAutodetector:
 
     def detect_enums(self):
         # Scan to_state new enums in use
-        for info in enum_fields(self.to_state):
-            if info.field.enum_type not in self.to_state.db_types:
-                self.to_state.add_type(info.field.enum_type, enum_state(info.field.enum, app_label=info.field.enum_app))
+        for info in find_fields(self.to_state, field_type=EnumField):
+            if info.field.type_name not in self.to_state.db_types:
+                self.to_state.add_type(info.field.type_name, enum_state(info.field.type_def, app_label=info.field.type_app_label))
 
         from_enum_types = set(db_type for db_type, e in self.from_state.db_types.items() if issubclass(e, Enum))
         to_enum_types = set(db_type for db_type, e in self.to_state.db_types.items() if issubclass(e, Enum))
@@ -200,11 +166,14 @@ class MysqlDatabaseWrapper:
 def patch_enum():
     # Patch migrations classes
     logger.info('Applying django_enum patches')
+
+    # If django_types not applied, do so
+    from django.db.migrations.state import ProjectState as DjangoProjectState
+    if not hasattr(DjangoProjectState, 'add_type'):
+        from django_types.patch import patch_types
+        patch_types()
+
     with patchy('django.db.migrations') as p:
-        # add_type, remove_type, clone
-        with p.cls('state.ProjectState', ProjectState) as c:
-            c.auto()
-            c.add('__init__')
         # ask_rename_enum
         p.cls('questioner.MigrationQuestioner', MigrationQuestioner).auto()
         p.cls('questioner.InteractiveMigrationQuestioner', InteractiveMigrationQuestioner).auto()
@@ -215,9 +184,6 @@ def patch_enum():
     with patchy('django.db.backends') as p:
         # Add base changes necessary
         p.cls('base.features.BaseDatabaseFeatures', BaseDatabaseFeatures).auto()
-        with p.cls('base.schema.BaseDatabaseSchemaEditor', BaseDatabaseSchemaEditor) as c:
-            c.auto()
-            c.add('_alter_column_type_sql')
 
         # Only patch database backends in use (avoid dependencies)
         if 'django.db.backends.postgresql' in sys.modules:
