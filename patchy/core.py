@@ -28,7 +28,7 @@ def resolve(path):
     with suppress(AttributeError, ModuleNotFoundError):
         find_spec(path)
         return import_module(path)
-    if path.find('.'):
+    if '.' in path:
         mod_str, cls_str = path.rsplit('.', maxsplit=1)
         mod = import_module(mod_str)
         return getattr(mod, cls_str)
@@ -74,7 +74,7 @@ class PatchModule(PatchBase):
 
     def cls(self, target, source=None):
         if isinstance(target, str):
-            if target.find('.'):
+            if '.'  in target:
                 mod_str, target = target.rsplit('.', maxsplit=1)
                 mod = import_module('.' + mod_str, package=self.target.__name__)
             else:
