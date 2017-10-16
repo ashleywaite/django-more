@@ -1,7 +1,7 @@
 # django_enum
 
 Provides a cross-database implementation of an EnumField for Django 1.11+.  
-It uses _django_types_ to provide mechanisms for state tracking in migration that need to be updated and modified at different stages, so that versioning is consistent in older states - enforcing correct enum states at the time of that migration instead of the current state of the enum in the project code.
+It uses [_django_types_](../django_types/) to provide mechanisms for state tracking in migration that need to be updated and modified at different stages, so that versioning is consistent in older states - enforcing correct enum states at the time of that migration instead of the current state of the enum in the project code.
 
 
 ## EnumField
@@ -33,8 +33,8 @@ Where the database supports enum types they will be used, by declaring types and
 
 ## Django patches
 
-Changes to Django that are necessary are applied by _patch_enum()_
-These are automatically applied via the app _ready()_ if you place django_enum into installed apps.
+Changes to Django that are necessary are applied by _patch_enum()_ using [_patchy_](../patchy/).
+These are automatically applied via the app [_ready()_](apps.py) if you place django_enum into installed apps.
 
 **MigrationQuestioner** (django.db.migrations.questioner.MigrationQuestioner)  
 Added blocks for enum operations.
