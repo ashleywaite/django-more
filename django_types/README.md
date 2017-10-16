@@ -26,14 +26,14 @@ Also used is an overloaded _str_ class that allows for the use of parametised va
 
 ## Django patches
 
-Changes to Django that are necessary are applied by _patch_enum()_
-These are automatically applied via the app _ready()_ if you place django_enum into installed apps.
+Changes to Django that are necessary are applied by _patch_types()_
+This should be called by any app that requires custom types.
 
 **ProjectState** (django.db.migrations.state.ProjectState)  
 Modified to store custom types that may be relevant to the database, and ensure that apps objects based on this state also have them available.
 
-**StateApps** (django.db.migrations.questioner.MigrationQuestioner)  
-Modified to allow for db_types to be provided on __init__ so that fields created will have access to type implementation classes.
+**StateApps** (django.db.migrations.state.StateApps)  
+Modified to allow for db_types to be provided on _\_\_init\_\__ so that fields created will have access to type implementation classes.
 
 **BaseDatabaseSchemaEditor** (django.db.backends.base.schema.BaseDatabaseSchemaEditor)  
 Modified _\_alter_column_type_sql()_ and _coloum_sql()_ to support parametised types.
