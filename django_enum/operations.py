@@ -73,7 +73,7 @@ class CreateEnum(EnumOperation):
 
     def database_backwards(self, app_label, schema_editor, from_state, to_state):
         if schema_editor.connection.features.requires_enum_declaration:
-            sql = schema_editor.sql_drop_enum % {
+            sql = schema_editor.sql_delete_enum % {
                 'enum_type': self.db_type}
             schema_editor.execute(sql)
 
@@ -131,15 +131,15 @@ class RenameEnum(EnumOperation):
         if schema_editor.connection.features.requires_enum_declaration:
             sql = schema_editor.sql_rename_enum % {
                 'old_type': self.old_db_type,
-                'enum_type': self.new_db_type}
+                'enum_type': self.db_type}
             schema_editor.execute(sql)
 
     def database_backwards(self, app_label, schema_editor, from_state, to_state):
-        self.old_db_type, self.new_db_type = self.new_db_type, self.old_db_type
+        self.old_db_type, self.db_type = self.db_type, self.old_db_type
 
         self.database_forwards(app_label, schema_editor, from_state, to_state)
 
-        self.old_db_type, self.new_db_type = self.new_db_type, self.old_db_type
+        self.old_db_type, self.db_type = self.db_type, self.old_db_type
 
 
 class AlterEnum(EnumOperation):
