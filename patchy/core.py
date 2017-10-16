@@ -157,3 +157,16 @@ class PatchClass(PatchBase):
                 setattr(self.target, attr, value)
             else:
                 setattr(self.target, attr, value)
+
+    # Replacing
+    def add_desc(self, *attrs, **kattrs):
+        for attr, value in kattrs.items():
+            setattr(self.target, attr, value)
+        for attr in attrs:
+            # Treat objects as assigned to their name
+            if hasattr(attr, "__name__"):
+                (attr, value) = (attr.__name__, attr)
+            else:
+                value = self.source.__dict__[attr]
+            old_val = self.target.__dict__.get(attr, None)
+            setattr(self.target, attr, value)
