@@ -172,15 +172,14 @@ class AlterEnum(EnumOperation):
         from_state.clear_delayed_apps_cache()
         db_alias = schema_editor.connection.alias
 
-        # Update old field states with live enum
-        self.make_live(from_state, self.db_type)
-
         # Get field/model list
         fields = [
-            (model, field, self.on_delete or field.on_delete)
+            (from_model, to_model, from_field, self.on_delete or field.on_delete)
             for info in self.get_fields(from_state, self.db_type)
-            for model in [from_state.apps.get_model(info.model_app_label, info.model_name)]
-            for field in [model._meta.get_field(info.field_name)]]
+            for from_model in [from_state.apps.get_model(info.model_app_label, info.model_name)]
+            for from_field in [from_model._meta.get_field(info.field_name)]
+            for to_model in [to_state.apps.get_model(info.model_app_label, info.model_name)]
+            ]
 
         if self.remove_values:
             # The first post delete actions are to finalise the field types
@@ -189,8 +188,8 @@ class AlterEnum(EnumOperation):
                     sql_alter_column_type = getattr(schema_editor,
                         'sql_alter_column_type_using',
                         schema_editor.sql_alter_column_type)
-                    for (model, field, on_delete) in fields:
-                        db_table = schema_editor.quote_name(model._meta.db_table)
+                    for (from_model, to_model, field, on_delete) in fields:
+                        db_table = schema_editor.quote_name(from_model._meta.db_table)
                         db_field = schema_editor.quote_name(field.column)
                         sql = schema_editor.sql_alter_column % {
                             'table': db_table,
@@ -200,22 +199,24 @@ class AlterEnum(EnumOperation):
                                 'old_type': self.db_type}}
                         post_actions.append((sql, []))
                 else:
-                    for (model, field, on_delete) in fields:
-                        db_table = schema_editor.quote_name(model._meta.db_table)
+                    for (from_model, to_model, field, on_delete) in fields:
+                        db_table = schema_editor.quote_name(from_model._meta.db_table)
                         db_field = schema_editor.quote_name(field.column)
+                        new_field = to_model._meta.get_field(field.name)
+                        db_type, params = new_field.db_type(schema_editor.connection).paramatized
                         sql = schema_editor.sql_alter_column % {
                             'table': db_table,
                             'changes': schema_editor.sql_alter_column_type % {
                                 'column': db_field,
-                                'type': field.db_type()}}
-                        post_actions.append((sql, []))
+                                'type': db_type}}
+                        post_actions.append((sql, params))
 
             if self.add_values:
                 # If there's the possibility of inconsistent actions, use transition type
                 # ie, ADD VALUE 'new_val' and REMOVE VALUE 'rem_val' ON DELETE SET('new_val')
                 # On DB's without enum support this isn't necessary as they are always CHAR
-                transition_fields = [(model, field)
-                    for (model, field, on_delete) in fields
+                transition_fields = [(from_model, field)
+                    for (from_model, to_model, field, on_delete) in fields
                     if hasattr(on_delete, 'deconstruct')
                         or (on_delete == models.SET_DEFAULT and field.get_default() in self.add_values)]
 
@@ -237,25 +238,24 @@ class AlterEnum(EnumOperation):
                     for (model, field) in transition_fields:
                         db_table = schema_editor.quote_name(model._meta.db_table)
                         db_field = schema_editor.quote_name(field.column)
-                        field.enum = transition_enum
-                        field.enum_type = self.transition_db_type
+                        field.type_name = self.transition_db_type
+                        field.type_def = transition_enum
+                        db_type, params = field.db_type(schema_editor.connection).paramatized
                         sql = schema_editor.sql_alter_column % {
                             'table': db_table,
                             'changes': schema_editor.sql_alter_column_type % {
                                 'column': db_field,
-                                'type': field.db_type()}}
-                        pre_actions.append((sql, []))
+                                'type': db_type}}
+                        pre_actions.append((sql, params))
 
-            # Create new type with temporary name
             if schema_editor.connection.features.requires_enum_declaration:
+                # Create new type with temporary name
                 to_enum = to_state.db_types[self.db_type]
                 sql = schema_editor.sql_create_enum % {
                     'enum_type': self.temp_db_type,
                     'values': ', '.join(['%s'] * len(to_enum))}
                 pre_actions.append((sql, to_enum.values()))
-
-            # Clean up original type and rename new one to replace it
-            if schema_editor.connection.features.requires_enum_declaration:
+                # Clean up original type and rename new one to replace it
                 sql = schema_editor.sql_delete_enum % {
                     'enum_type': self.db_type}
                 post_actions.append((sql, []))
@@ -263,6 +263,7 @@ class AlterEnum(EnumOperation):
                     'old_type': self.temp_db_type,
                     'enum_type': self.db_type}
                 post_actions.append((sql, []))
+
         elif self.add_values:
             # Just adding values? Directly modify types, no hassle!
             if schema_editor.connection.features.requires_enum_declaration:
@@ -272,15 +273,18 @@ class AlterEnum(EnumOperation):
                         'value': '%s'}
                     post_actions.append((sql, [value]))
             elif schema_editor.connection.features.has_enum:
-                for (model, field, on_delete) in fields:
-                    db_table = schema_editor.quote_name(model._meta.db_table)
+                for (from_model, to_model, field, on_delete) in fields:
+                    db_table = schema_editor.quote_name(from_model._meta.db_table)
                     db_field = schema_editor.quote_name(field.column)
-                    sql = schema_editor.sql_alter_column % {
+                    new_field = to_model._meta.get_field(field.name)
+                    db_type, params = new_field.db_type(schema_editor.connection).paramatized
+
+                    schema_editor.sql_alter_column % {
                         'table': db_table,
                         'changes': schema_editor.sql_alter_column_type % {
                             'column': db_field,
-                            'type' : field.db_type()}}
-                    post_actions.append((sql, []))
+                            'type' : db_type}}
+                    post_actions.append((sql, params))
 
         # Prepare database for data to be migrated
         for sql, params in pre_actions:
@@ -288,14 +292,18 @@ class AlterEnum(EnumOperation):
 
         # Apply all on_delete actions making data consistent with to_state values
         if self.remove_values:
+            # Cheap hack to allow on_delete to work
+            for (from_model, to_model, field, on_delete) in fields:
+                field.remote_field = self
+
             # Records affected by on_delete action
             on_delete_gen = ((
                     field,
-                    model.objects.using(db_alias).filter(
+                    from_model.objects.using(db_alias).filter(
                         models.Q(('{}__in'.format(field.name), self.remove_values))
                     ).only('pk'),
                     on_delete)
-                for (model, field, on_delete) in fields)
+                for (from_model, to_model, field, on_delete) in fields)
 
             # Validate on_delete constraints
             collector = Collector(using=db_alias)
