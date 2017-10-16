@@ -94,7 +94,6 @@ class CustomTypeField(models.Field):
                 type_def = apps.db_types[self.type_name]
                 self.type_def = type_def
 
-
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
         if self.type_name:

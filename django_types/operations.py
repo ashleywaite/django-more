@@ -23,10 +23,3 @@ def find_fields(state, db_type=None, field_type=None):
 
 class CustomTypeOperation(Operation):
     get_fields = staticmethod(find_fields)
-
-    def make_all_live(self, state, db_type, field_type=None):
-        # Update field states with live types
-        type_def = state.db_types[db_type]
-        for info in self.get_fields(state, db_type, field_type):
-            info.field.make_live(state)
-            state.reload_model(info.model_app_label, info.model_name)

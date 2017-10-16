@@ -113,31 +113,6 @@ class BaseDatabaseSchemaEditor:
         )
 
 
-class AddField:
-    def state_forwards(self, app_label, state):
-        # Inject make_live to ensure valid stateful version of type available
-        if hasattr(self.field, 'make_live'):
-            self.field.make_live(state)
-        self.state_forwards.__patched__(self, app_label, state)
-
-
-class CreateModel:
-    def state_forwards(self, app_label, state):
-        # Inject make_live to ensure valid stateful version of type available
-        for field in self.fields:
-            if hasattr(field, 'make_live'):
-                field.make_live(state)
-        self.state_forwards.__patched__(self, app_label, state)
-
-
-class AlterField:
-    def state_forwards(self, app_label, state):
-        # Inject make_live to ensure valid stateful version of type available
-        if hasattr(self.field, 'make_live'):
-            self.field.make_live(state)
-        self.state_forwards.__patched__(self, app_label, state)
-
-
 def patch_types():
     logger.info('Applying django_types patches')
 
@@ -148,9 +123,6 @@ def patch_types():
             c.add_desc('apps')
         with p.cls('StateApps', StateApps) as c:
             c.add('__init__')
-        #p.cls('operations.fields.AddField', AddField).auto()
-        #p.cls('operations.fields.AlterField', AlterField).auto()
-        #p.cls('operations.models.CreateModel', CreateModel).auto()
 
     # Patch backend classes to allow parametised db_types
     with patchy('django.db.backends.base.schema.BaseDatabaseSchemaEditor', BaseDatabaseSchemaEditor) as c:
