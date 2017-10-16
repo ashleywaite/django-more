@@ -4,6 +4,7 @@ import logging
 # Framework imports
 import django
 from django.db import models
+from django.conf import settings
 # Project imports
 from patchy import patchy
 from django_types import find_fields
@@ -178,11 +179,10 @@ def patch_enum():
         p.cls('base.features.BaseDatabaseFeatures', BaseDatabaseFeatures).auto()
 
         # Only patch database backends in use (avoid dependencies)
-        if 'django.db.backends.postgresql' in sys.modules:
-            p.cls('postgresql.features.DatabaseFeatures', PostgresDatabaseFeatures).auto()
-            p.cls('postgresql.schema.DatabaseSchemaEditor', PostgresDatabaseSchemaEditor).auto()
-            p.cls('postgresql.base.DatabaseWrapper', PostgresDatabaseWrapper).merge('data_types')
-
-        if 'django.db.backends.mysql' in sys.modules:
-            p.cls('mysql.features.DatabaseFeatures', MysqlDatabaseFeatures).auto()
-            p.cls('mysql.base.DatabaseWrapper', MysqlDatabaseWrapper).merge('data_types')
+        for backend in set(db_dict['ENGINE'] for db_name, db_dict in settings.DATABASES.items()):
+            if backend == 'django.db.backends.postgresql':
+                p.cls('postgresql.features.DatabaseFeatures', PostgresDatabaseFeatures).auto()
+                p.cls('postgresql.schema.DatabaseSchemaEditor', PostgresDatabaseSchemaEditor).auto()
+            if backend == 'django.db.backends.mysql':
+                import django.db.backends.mysql.base
+                p.cls('mysql.features.DatabaseFeatures', MysqlDatabaseFeatures).auto()
