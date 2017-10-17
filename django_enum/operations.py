@@ -44,10 +44,7 @@ def enum_state(values, name=None, app_label=None):
 
 
 class EnumOperation(CustomTypeOperation):
-    # Override get fields to restrict to EnumFields
-    @staticmethod
-    def get_fields(state, db_type=None, field_type=EnumField):
-        return CustomTypeOperation.get_fields(state, db_type, field_type)
+    field_type = EnumField
 
 
 class CreateEnum(EnumOperation):
@@ -121,7 +118,7 @@ class RenameEnum(EnumOperation):
         state.add_type(self.db_type, enum)
 
         # Update all fields using this enum
-        for info in self.get_fields(state, self.old_db_type):
+        for info in self.get_fields(state, db_type=self.old_db_type):
             changed_field = info.field.clone()
             changed_field.type_name = self.db_type
             info.model_state.fields[info.field_index] = (info.field_name, changed_field)
@@ -164,7 +161,7 @@ class AlterEnum(EnumOperation):
         state.add_type(self.db_type, to_enum)
 
         # Update all fields using this enum
-        for info in self.get_fields(state, self.db_type):
+        for info in self.get_fields(state):
             changed_field = info.field.clone()
             changed_field.type_def = to_enum
             info.model_state.fields[info.field_index] = (info.field_name, changed_field)
@@ -182,7 +179,7 @@ class AlterEnum(EnumOperation):
         # Get field/model list
         fields = [
             (from_model, to_model, from_field, self.on_delete or field.on_delete)
-            for info in self.get_fields(from_state, self.db_type)
+            for info in self.get_fields(from_state)
             for from_model in [from_state.apps.get_model(info.model_app_label, info.model_name)]
             for from_field in [from_model._meta.get_field(info.field_name)]
             for to_model in [to_state.apps.get_model(info.model_app_label, info.model_name)]

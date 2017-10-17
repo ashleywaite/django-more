@@ -22,4 +22,11 @@ def find_fields(state, db_type=None, field_type=None):
 
 
 class CustomTypeOperation(Operation):
-    get_fields = staticmethod(find_fields)
+    field_type = CustomTypeField
+    db_type = None
+
+    def get_fields(self, state, db_type=None, field_type=None):
+        return find_fields(
+            state,
+            db_type=db_type or self.db_type,
+            field_type=field_type or self.field_type)
