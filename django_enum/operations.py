@@ -120,7 +120,7 @@ class RenameEnum(EnumOperation):
         state.remove_type(self.old_db_type)
         state.add_type(self.db_type, enum)
 
-        # Alter all fields using this enum
+        # Update all fields using this enum
         for info in self.get_fields(state, self.old_db_type):
             changed_field = info.field.clone()
             changed_field.type_name = self.db_type
@@ -162,6 +162,13 @@ class AlterEnum(EnumOperation):
         from_enum = state.db_types[self.db_type]
         to_enum = enum_state((from_enum.values_set() | self.add_values) - self.remove_values, name=self.db_type, app_label=app_label)
         state.add_type(self.db_type, to_enum)
+
+        # Update all fields using this enum
+        for info in self.get_fields(state, self.db_type):
+            changed_field = info.field.clone()
+            changed_field.type_def = to_enum
+            info.model_state.fields[info.field_index] = (info.field_name, changed_field)
+            state.reload_model(info.model_app_label, info.model_name)
 
     def database_forwards(self, app_label, schema_editor, from_state, to_state):
         # Compare from_state and to_state and generate the appropriate ALTER commands
@@ -318,4 +325,8 @@ class AlterEnum(EnumOperation):
             schema_editor.execute(sql, params)
 
     def database_backwards(self, app_label, schema_editor, from_state, to_state):
-        pass
+        self.add_values, self.remove_values = self.remove_values, self.add_values
+
+        self.database_forwards(app_label, schema_editor, from_state, to_state)
+
+        self.add_values, self.remove_values = self.remove_values, self.add_values
