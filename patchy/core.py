@@ -66,6 +66,19 @@ class PatchBase:
         attrs = get_attrs(source or self.source, types)
         self.add(*attrs)
 
+    def add(self, *attrs, **kattrs):
+        """ Add attributes or classes """
+        if kattrs:
+            for attr, value in kattrs.items():
+                apply_patch(self.target, attr, value)
+        for attr in attrs:
+            # Treat objects as assigned to their name
+            if hasattr(attr, "__name__"):
+                (attr, value) = (attr.__name__, attr)
+            else:
+                value = getattr(self.source, attr)
+            apply_patch(self.target, attr, value)
+
 
 class PatchModule(PatchBase):
     def __init__(self, target, source=None, module_sep='_'):
@@ -101,21 +114,6 @@ class PatchModule(PatchBase):
 
         if isinstance(target, ModuleType):
             return PatchModule(target, source, self.module_sep)
-
-    def add(self, *attrs, **kattrs):
-        """ Add attributes or classes """
-        for attr in attrs:
-            # Treat objects as assigned by their name
-            if hasattr(attr, "__name__"):
-                kattrs[attr.__name__] = attr
-            else:
-                kattrs[attr] = getattr(self.source, attr)
-        if kattrs:
-            logger.info("Patching {m} with attrs: {a}".format(
-                m=self.target.__name__,
-                a=kattrs.keys()))
-            for attr, value in kattrs.items():
-                apply_patch(self.target, attr, value)
 
 
 def super_patchy(*args, do_call=True, **kwargs):
@@ -171,30 +169,6 @@ class PatchClass(PatchBase):
 
     def mod(self):
         return self.target.__module__
-
-    def add(self, *attrs, **kattrs):
-        """ Add attributes or classes """
-        if kattrs:
-            logger.info("Patching {m}.{c} directly with attrs: {a}".format(
-                m=self.target.__module__,
-                c=self.target.__name__,
-                a=kattrs.keys()))
-            for attr, value in kattrs.items():
-                setattr(self.target, attr, value)
-        for attr in attrs:
-            # Treat objects as assigned to their name
-            if hasattr(attr, "__name__"):
-                (attr, value) = (attr.__name__, attr)
-            else:
-                value = getattr(self.source, attr)
-            old_val = getattr(self.target, attr, None)
-            logger.debug(" {c}.{a} was {f1}, but will be {f2}{r}".format(
-                c=self.target.__name__,
-                a=attr,
-                f1=old_val,
-                f2=value,
-                r=" as a classmethod" if isinstance(value, MethodType) else ""))
-            apply_patch(self.target, attr, value)
 
     # Replacing
     def add_desc(self, *attrs, **kattrs):
