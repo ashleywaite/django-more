@@ -24,6 +24,24 @@ def patchy(target, source=None):
         return PatchClass(target, source)
 
 
+def super_patchy(*args, do_call=True, **kwargs):
+    """ super() for patches!
+        When called from within a patched in function will return or call the
+        function that it replaced, preserving self/cls arguments
+    """
+    caller_frame = inspect.currentframe().f_back
+    caller = inspect.getargvalues(caller_frame)
+
+    old_func = patchy_records[caller_frame.f_code]
+
+    if caller.args[0] in ['self', 'cls']:
+        # If caller has the appearance of being bound (to instance or class)
+        old_func = MethodType(old_func, caller.locals[caller.args[0]])
+    if do_call:
+        return old_func(*args, **kwargs)
+    return old_func
+
+
 def resolve(path):
     """ Turn a dotted name into a module or class reference """
     with suppress(AttributeError, ModuleNotFoundError):
