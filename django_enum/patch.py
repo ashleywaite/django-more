@@ -6,7 +6,7 @@ import django
 from django.db import models
 from django.conf import settings
 # Project imports
-from patchy import patchy
+from patchy import patchy, super_patchy
 from django_types import find_fields
 from .operations import CreateEnum, RemoveEnum, RenameEnum, AlterEnum, enum_state
 from .fields import EnumField
@@ -153,7 +153,7 @@ class MigrationAutodetector:
     # Must do before models, so inject detect_enums via here
     def generate_created_models(self):
         self.detect_enums()
-        self.generate_created_models.__patched__(self)
+        super_patchy()
 
 
 def patch_enum():

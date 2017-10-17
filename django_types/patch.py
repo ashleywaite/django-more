@@ -3,7 +3,7 @@ import logging
 from contextlib import suppress
 from django.utils.functional import cached_property
 # Project imports
-from patchy import patchy
+from patchy import patchy, super_patchy
 from django.db.migrations.state import StateApps as DjangoStateApps
 
 logger = logging.getLogger(__name__)
@@ -14,12 +14,12 @@ class StateApps(DjangoStateApps):
     def __init__(self, *args, db_types=None, **kwargs):
         self.db_types = db_types or {}
         #print('StateApps for db_types')
-        self.__init__.__patched__(self, *args, **kwargs)
+        super_patchy(*args, **kwargs)
 
 
 class ProjectState:
     def __init__(self, *args, **kwargs):
-        self.__init__.__patched__(self, *args, **kwargs)
+        super_patchy(*args, **kwargs)
         self.db_types = {}
 
     @cached_property
@@ -38,7 +38,7 @@ class ProjectState:
 
     def clone(self):
         # Clone db_types state as well
-        new_state = self.clone.__patched__(self)
+        new_state = super_patchy()
         new_state.db_types = self.db_types.copy()
         if 'apps' in self.__dict__:  # hasattr would cache the property
             new_state.apps.db_types = self.apps.db_types.copy()
