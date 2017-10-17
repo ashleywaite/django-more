@@ -45,8 +45,36 @@ def get_attrs(obj, types, exclude_hidden=True):
     return [k for k, v in attrs if isinstance(v, types)]
 
 
-class PatchBase:
+class PatchyRecords(dict):
+    def __getitem__(self, key):
+        with suppress(AttributeError):
+            key = key.__code__
+        with suppress(KeyError):
+            return super().__getitem__(id(key))
+        raise RuntimeError('Patched func cannot find its predecessor')
 
+    def __setitem__(self, key, value):
+        # Strip inbult decorators
+        if isinstance(value, (classmethod, staticmethod)):
+            value = value.__func__
+        with suppress(AttributeError):
+            key = key.__code__
+        return super().__setitem__(id(key), value)
+
+    def __delitem__(self, key):
+        with suppress(AttributeError):
+            key = key.__code__
+        return super().__delitem__(id(key))
+
+    def __contains__(self, key):
+        with suppress(AttributeError):
+            key = key.__code__
+        return super().__contains__(id(key))
+
+patchy_records = PatchyRecords()
+
+
+class PatchBase:
     def __enter__(self):
         return self
 
@@ -131,16 +159,6 @@ def super_patchy(*args, do_call=True, **kwargs):
     if do_call:
         return old_func(*args, **kwargs)
     return old_func
-
-
-def get_records(context, patchy_var='__patchy__'):
-    with suppress(AttributeError):
-        # From a frame
-        return context.f_globals[patchy_var]
-    # Ensure patchy records exist
-    if patchy_var not in context.__globals__:
-        context.__globals__[patchy_var] = {}
-    return context.__globals__.get(patchy_var)
 
 
 def apply_patch(target, attr, value):
