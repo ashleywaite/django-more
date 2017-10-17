@@ -68,7 +68,8 @@ class EnumField(CustomTypeField):
             for em in self.type_def:
                 if str(value).lower() == em.value.lower():
                     return em
-        raise ValidationError('Invalid enumeration value')
+        raise ValidationError("Invalid value '{}' not in enumeration {}".format(
+            value, [em.value for em in self.type_def]))
 
     def get_prep_value(self, value):
         if not value:
