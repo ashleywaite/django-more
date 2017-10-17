@@ -1,12 +1,13 @@
 """ Generic monkey patching functions for doing it (mostly) safely """
 
 import logging
+import inspect
 from types import MethodType, ModuleType, FunctionType
 from importlib import import_module
 from importlib.util import find_spec
 from contextlib import suppress
 
-__all__ = ['patchy']
+__all__ = ['patchy', 'super_patchy']
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +115,53 @@ class PatchModule(PatchBase):
                 m=self.target.__name__,
                 a=kattrs.keys()))
             for attr, value in kattrs.items():
-                setattr(self.target, attr, value)
+                apply_patch(self.target, attr, value)
+
+
+def super_patchy(*args, do_call=True, **kwargs):
+    caller_frame = inspect.currentframe().f_back
+    caller = inspect.getargvalues(caller_frame)
+
+    old_func = get_records(caller_frame).get(id(caller_frame.f_code))
+
+    if not old_func:
+        raise RuntimeError('Patched func cannot find its predecessor')
+
+    if caller.args[0] in ['self', 'cls']:
+        # If caller has the appearance of being bound (to instance or class)
+        old_func = MethodType(old_func, caller.locals[caller.args[0]])
+    if do_call:
+        return old_func(*args, **kwargs)
+    return old_func
+
+
+def get_records(context, patchy_var='__patchy__'):
+    with suppress(AttributeError):
+        # From a frame
+        return context.f_globals[patchy_var]
+    # Ensure patchy records exist
+    if patchy_var not in context.__globals__:
+        context.__globals__[patchy_var] = {}
+    return context.__globals__.get(patchy_var)
+
+
+def apply_patch(target, attr, value):
+    old_value = inspect.getattr_static(target, attr, None)
+
+    # If callable, preserve old func
+    if callable(value) and callable(old_value):
+        patchy_records = get_records(value)
+        # Prevent duplicate patching
+        if id(value.__code__) in patchy_records:
+            return
+        # Strip inbult decorators
+        if isinstance(old_value, (classmethod, staticmethod)):
+            old_value = old_value.__func__
+
+        patchy_records[id(value.__code__)] = old_value
+
+    # Apply patched value
+    setattr(target, attr, value)
 
 
 class PatchClass(PatchBase):
@@ -147,16 +194,7 @@ class PatchClass(PatchBase):
                 f1=old_val,
                 f2=value,
                 r=" as a classmethod" if isinstance(value, MethodType) else ""))
-            if isinstance(value, MethodType):
-                # Rebind if a classmethod and make old value available
-                setattr(value.__func__, '__patched__', old_val)
-                setattr(self.target, attr, classmethod(value.__func__))
-            elif isinstance(value, FunctionType):
-                # Make old value available, but will not be bound to instances if a function
-                setattr(value, '__patched__', old_val)
-                setattr(self.target, attr, value)
-            else:
-                setattr(self.target, attr, value)
+            apply_patch(self.target, attr, value)
 
     # Replacing
     def add_desc(self, *attrs, **kattrs):
