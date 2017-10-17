@@ -35,6 +35,7 @@ def resolve(path):
         return getattr(mod, cls_str)
     raise ValueError('Must be a valid class or module name')
 
+
 # inspect.getmembers includes values in mro
 # obj.__dict__ includes hidden attributes
 # obj.__dict__ returns wrapped objects
@@ -96,16 +97,23 @@ class PatchBase:
 
     def add(self, *attrs, **kattrs):
         """ Add attributes or classes """
-        if kattrs:
-            for attr, value in kattrs.items():
-                apply_patch(self.target, attr, value)
         for attr in attrs:
             # Treat objects as assigned to their name
             if hasattr(attr, "__name__"):
-                (attr, value) = (attr.__name__, attr)
+                kattrs[attr.__name__] = attr
             else:
-                value = getattr(self.source, attr)
-            apply_patch(self.target, attr, value)
+                kattrs[attr] = getattr(self.source, attr)
+        for attr, value in kattrs.items():
+            old_value = inspect.getattr_static(self.target, attr, None)
+            # If callable, preserve old func
+            if callable(value) and callable(old_value):
+                # Prevent duplicate patching
+                if value in patchy_records:
+                    return
+                patchy_records[value] = old_value
+            # Apply patched value
+            setattr(self.target, attr, value)
+
 
 
 class PatchModule(PatchBase):
@@ -142,42 +150,6 @@ class PatchModule(PatchBase):
 
         if isinstance(target, ModuleType):
             return PatchModule(target, source, self.module_sep)
-
-
-def super_patchy(*args, do_call=True, **kwargs):
-    caller_frame = inspect.currentframe().f_back
-    caller = inspect.getargvalues(caller_frame)
-
-    old_func = get_records(caller_frame).get(id(caller_frame.f_code))
-
-    if not old_func:
-        raise RuntimeError('Patched func cannot find its predecessor')
-
-    if caller.args[0] in ['self', 'cls']:
-        # If caller has the appearance of being bound (to instance or class)
-        old_func = MethodType(old_func, caller.locals[caller.args[0]])
-    if do_call:
-        return old_func(*args, **kwargs)
-    return old_func
-
-
-def apply_patch(target, attr, value):
-    old_value = inspect.getattr_static(target, attr, None)
-
-    # If callable, preserve old func
-    if callable(value) and callable(old_value):
-        patchy_records = get_records(value)
-        # Prevent duplicate patching
-        if id(value.__code__) in patchy_records:
-            return
-        # Strip inbult decorators
-        if isinstance(old_value, (classmethod, staticmethod)):
-            old_value = old_value.__func__
-
-        patchy_records[id(value.__code__)] = old_value
-
-    # Apply patched value
-    setattr(target, attr, value)
 
 
 class PatchClass(PatchBase):
