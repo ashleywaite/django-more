@@ -49,7 +49,7 @@ class CTEQuery(Query):
     compiler = 'SQLCTESelectCompiler'
 
 
-def list_difference(source, subtract):
+def _list_difference(source, subtract):
     return (item for item in source if item not in subtract)
 
 
@@ -77,7 +77,7 @@ class WithQuery:
 
     def add_with(self, with_query):
         if hasattr(with_query, "queries"):
-            self.queries.extend(list_difference(with_query.queries, self.queries))
+            self.queries.extend(_list_difference(with_query.queries, self.queries))
         if with_query not in self.queries:
             self.queries.append(with_query)
 
