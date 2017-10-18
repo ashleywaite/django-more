@@ -5,7 +5,7 @@
 
     Order of patching *matters*.
 """
-from importlib import reload
+from importlib import reload, import_module
 # Project imports
 from patchy import patchy
 
@@ -22,8 +22,8 @@ def patch_cte():
                 'SQLWithCompiler',
                 'SQLLiteralCompiler')
         with p.mod('sql.subqueries') as m:
-            m.merge('__all__')
-            m.add(
+            m.merge(
+                '__all__',
                 'UpdateReturningQuery',
                 'InsertReturningQuery',
                 'WithQuery',
