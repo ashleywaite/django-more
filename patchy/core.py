@@ -113,22 +113,23 @@ class PatchBase:
     def __exit__(self, exc_type, exc_value, traceback):
         pass
 
-    def merge(self, *attrs, **kattrs):
-        for attr in attrs:
-            kattrs[attr] = getattr(self.source, attr)
-        for attr, value in kattrs.items():
-            if isinstance(value, dict):
-                getattr(self.target, attr).update(value)
-            if isinstance(value, list):
-                getattr(self.target, attr).extend(value)
-
-    def auto(self, source=None, *, types=object):
+    def auto(self, source=None, *, merge=True, types=object):
+        """ Apply all attributes of specified types from source to target.
+            Defaults to merging collections.
+        """
         attrs = get_attrs(source or self.source, types)
-        self.add(*attrs)
+        self.apply(attrs, merge=merge)
 
     def add(self, *attrs, **kattrs):
-        """ Add attributes or classes """
+        self.apply(attrs, kattrs)
+
+    def merge(self, *attrs, **kattrs):
+        self.apply(attrs, kattrs, merge=True)
+
+    def apply(self, attrs=None, kattrs=None, merge=False):
+        """ Apply new attributes or classes to the target """
         for attr in attrs:
+            kattrs = kattrs or {}
             # Treat objects as assigned to their name
             if hasattr(attr, "__name__"):
                 kattrs[attr.__name__] = attr
@@ -142,6 +143,13 @@ class PatchBase:
                 if value in patchy_records:
                     return
                 patchy_records[value] = old_value
+            # Merge collections instead of replacing
+            if merge:
+                if isinstance(value, dict) and isinstance(old_value, dict):
+                    getattr(self.target, attr).update(value)
+                elif isinstance(value, list) and isinstance(old_value, list):
+                    getattr(self.target, attr).extend(value)
+
             # Apply patched value
             setattr(self.target, attr, value)
 
