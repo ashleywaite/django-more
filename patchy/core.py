@@ -68,16 +68,6 @@ def resolve(name, package=None):
         within=', within {}'.format(package.__name__) if package else ''))
 
 
-# inspect.getmembers includes values in mro
-# obj.__dict__ includes hidden attributes
-# obj.__dict__ returns wrapped objects
-# Use obj.__dict__ with getattr() to avoid mro and wrappings
-def get_attrs(obj, types, exclude_hidden=True):
-    """ Get the locally declared attributes of an object filtered by type """
-    attrs = ((k, getattr(obj, k)) for k in obj.__dict__ if not exclude_hidden or not k.startswith('_'))
-    return [k for k, v in attrs if isinstance(v, types)]
-
-
 class PatchyRecords(dict):
     def __getitem__(self, key):
         with suppress(AttributeError):
@@ -108,18 +98,20 @@ patchy_records = PatchyRecords()
 
 
 class PatchBase:
+    allow = {}
+
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         pass
 
-    def auto(self, source=None, *, merge=True, types=object):
-        """ Apply all attributes of specified types from source to target.
+    def auto(self, source=None, *, merge=True):
+        """ Apply all attributes of from source to target.
             Defaults to merging collections.
         """
-        attrs = get_attrs(source or self.source, types)
-        self.apply(attrs, merge=merge)
+        attrs = self.get_auto_attrs(source or self.source)
+        self.apply(dict(attrs), merge=merge)
 
     def add(self, *attrs, **kattrs):
         self.apply(attrs, kattrs)
@@ -172,9 +164,20 @@ class PatchBase:
             # Apply patched value
             setattr(self.target, attr, value)
 
+    def get_attrs(self, source=None, exclude_hidden=True):
+        # Get all attributes, except hidden if exclude_hidden
+        # but allowing whitelisted attributes (like __all__)
+        source = source or self.source
+        return ((attr, val)
+            for attr, val in source.__dict__.items()
+                if attr in self.allow
+                or not exclude_hidden
+                or not attr.startswith('_'))
 
 
 class PatchModule(PatchBase):
+    allow = {'__all__'}
+
     def __init__(self, target, source=None, module_sep='_'):
         self.target = target
         self.source = source
@@ -217,7 +220,17 @@ class PatchModule(PatchBase):
                 logger.info('Patching {} using {}'.format(target.__name__, source.__name__))
             return PatchModule(target, source, self.module_sep)
 
+    def get_auto_attrs(self, source=None, exclude_hidden=True):
+        # Only auto locally declared objects, or attributes in allow
+        return ((attr, val)
+            for attr, val in self.get_attrs(source, exclude_hidden)
+                if (hasattr(val, '__module__') and val.__module__ == source.__name__)
+                or attr in self.allow)
+
+
 class PatchClass(PatchBase):
+    allow = {'__init__', '__new__'}
+
     def __init__(self, target, source):
         self.target = target
         self.source = source
@@ -237,3 +250,10 @@ class PatchClass(PatchBase):
                 value = self.source.__dict__[attr]
             old_val = self.target.__dict__.get(attr, None)
             setattr(self.target, attr, value)
+
+    def get_auto_attrs(self, source=None, exclude_hidden=True):
+        # Only auto attributes, locally declared objects, or hiddens in allow
+        return ((attr, val)
+            for attr, val in self.get_attrs(source, exclude_hidden)
+                if not hasattr(val, '__module__')
+                or val.__module__ == source.__module__)
