@@ -33,14 +33,20 @@ def new_func(arg):
 ## Patch class
 
 **add(\*attrs, \*\*kattrs)**  
-Any attrs with a *\_\_name__* attribute will be applied to the target with that as their attribute name.  
-Any values provided as attrs will be fetched from the provided source and applied to the target.
+_apply()_ without merge.
 
-Any values provided as kattrs will be applied directly to the target with the name specified.
+**merge(\*attrs, \*\*kattrs)**
+_apply()_ with merge.
 
-**auto(types=object)**  
-Will automatically apply all attributes of the source to the target.  
+**auto(merge=True, types=object)**  
+Will automatically apply all non-private attributes of the source to the target.  
 _types_ will filter the attributes automatically applied to those that are instances provided, as per _isinstance()_
+
+**apply(attrs, kattrs, merge=False)**
+Any attrs with a *\_\_name__* attribute will be applied to the target with that as their attribute name.  
+Any values provided as attrs will be fetched from the provided source and applied to the target.  
+Any values provided as kattrs will be applied directly to the target with the name specified.  
+Merge will attempt to combine collections instead of replacing them.
 
 **cls(target, source=None)**  
 Get a patching instance for the specified class, relative to the patching class it is called from.
