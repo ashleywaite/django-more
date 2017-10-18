@@ -42,16 +42,29 @@ def super_patchy(*args, do_call=True, **kwargs):
     return old_func
 
 
-def resolve(path):
+def resolve(name, package=None):
     """ Turn a dotted name into a module or class reference """
-    with suppress(AttributeError, ModuleNotFoundError):
-        find_spec(path)
-        return import_module(path)
-    if '.' in path:
-        mod_str, cls_str = path.rsplit('.', maxsplit=1)
-        mod = import_module(mod_str)
-        return getattr(mod, cls_str)
-    raise ValueError('Must be a valid class or module name')
+
+    if isinstance(package, str):
+        package = import_module(package)
+    package_name = package.__name__ if package else None
+
+    with suppress(AttributeError, ImportError):
+        return import_module('{r}{n}'.format(r='.' if package else '', n=name), package_name)
+
+    with suppress(ImportError):
+        if '.' in name:
+            mod, name = name.rsplit('.', maxsplit=1)
+            package = import_module('{r}{n}'.format(r='.' if package else '', n=mod), package_name)
+        elif not isinstance(package, ModuleType):
+            package = import_module(package)
+
+        with suppress(AttributeError):
+            return getattr(package, name)
+
+    raise ImportError('{name} is not a valid class or module name{within}'.format(
+        name=name,
+        within=', within {}'.format(package.__name__) if package else ''))
 
 
 # inspect.getmembers includes values in mro
