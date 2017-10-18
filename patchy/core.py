@@ -3,6 +3,7 @@
 import logging
 import inspect
 from types import MethodType, ModuleType, FunctionType
+from collections import abc
 from importlib import import_module
 from importlib.util import find_spec
 from contextlib import suppress
@@ -143,13 +144,31 @@ class PatchBase:
                 if value in patchy_records:
                     return
                 patchy_records[value] = old_value
-            # Merge collections instead of replacing
-            if merge:
-                if isinstance(value, dict) and isinstance(old_value, dict):
-                    getattr(self.target, attr).update(value)
-                elif isinstance(value, list) and isinstance(old_value, list):
-                    getattr(self.target, attr).extend(value)
 
+            # Merge collections and classes instead of replacing
+            if merge:
+                if isinstance(old_value, abc.Container):
+                    if isinstance(value, abc.Mapping) and isinstance(old_value, abc.MutableMapping):
+                        old_value.update(value)
+                        logger.info('Merging mapping {mod}.{attr}'.format(mod=self.target.__name__, attr=attr))
+                    elif isinstance(value, abc.Sequence) and isinstance(old_value, abc.MutableSequence):
+                        old_value.extend(value)
+                        logger.info('Merging sequence {mod}.{attr}'.format(mod=self.target.__name__, attr=attr))
+                    elif isinstance(value, abc.Set) and isinstance(old_value, abc.MutableSet):
+                        old_value.update(value)
+                        logger.info('Merging set {mod}.{attr}'.format(mod=self.target.__name__, attr=attr))
+                    else:
+                        setattr(self.target, attr, value)
+                        logger.info("Couldn't merge collection {target}.{attr}, replaced instead".format(
+                            target=self.target.__name__,
+                            attr=attr))
+                    continue
+                elif isinstance(old_value, type):
+                    logger.info('Merging class for {target}.{attr}'.format(
+                        target=self.target.__name__, attr=attr))
+                    self.cls(old_value, value).auto()
+                    continue
+            logger.info('Setting value {target}.{attr}'.format(target=self.target.__name__, attr=attr))
             # Apply patched value
             setattr(self.target, attr, value)
 
