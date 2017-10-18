@@ -155,33 +155,40 @@ class PatchModule(PatchBase):
 
     def cls(self, target, source=None):
         if isinstance(target, str):
-            if '.'  in target:
-                mod_str, target = target.rsplit('.', maxsplit=1)
-                mod = import_module('.' + mod_str, package=self.target.__name__)
-            else:
-                mod = self.target
-            target = getattr(mod, target)
-        if isinstance(source, str):
-            source = getattr(self.source, source)
-
+            target = resolve(target, package=self.target)
+        if self.source and source is None:
+            with suppress(ImportError):
+                source_str = '{mod}.{cls}'.format(
+                    mod=target.__module__.replace('.', self.module_sep),
+                    cls=target.__name__)
+                source = resolve(source_str, package=self.source)
+            if not source:
+                with suppress(AttributeError):
+                    source = getattr(self.source, target.__name__)
+        elif isinstance(source, str):
+            source = resolve(source, package=self.source)
         if isinstance(target, type):
             return PatchClass(target, source)
         raise TypeError('Must be a valid class or class name')
 
     def mod(self, target, source=None):
         if isinstance(target, str):
-            target = import_module('.' + target, package=self.target.__name__)
+            target = resolve(target, package=self.target.__name__)
         if isinstance(source, str):
-            source = import_module('.' + source, package=self.source.__name__)
+            source = resolve(source, package=self.source.__name__)
+
         elif source is None:
             #parent = import_module('..', package=self.source.__name__)
             # Deal with nested modules in a pack
+            # Test for corresponding module relative to current source
             source_name = target.__name__.replace('.', self.module_sep)
-            source = import_module('..' + source, package=self.source.__name__)
+            with suppress(ImportError):
+                source = resolve(source_name, package=self.source.__name__)
 
         if isinstance(target, ModuleType):
+            if source:
+                logger.info('Patching {} using {}'.format(target.__name__, source.__name__))
             return PatchModule(target, source, self.module_sep)
-
 
 class PatchClass(PatchBase):
     def __init__(self, target, source):
