@@ -8,7 +8,7 @@ Generic monkey patching tool to keep patches better organised and uniform.
 Takes a target (class or module to be patched) and source (class or module to use for named attributes to patch in) and returns an instance that allows you to apply patches to it.  
 Source or target can be a class or module instance, or a dotted path to one.
 
-```python3
+```python
 from patchy import patchy
 
 with patchy('django', 'my_djago_patch') as p:
@@ -21,7 +21,7 @@ with patchy('django', 'my_djago_patch') as p:
 
 When called from within a function that has been monkey patched into somewhere else by patchy, will call or return the function that it replaced.
 
-```python3
+```python
 from patchy import super_patchy
 
 def new_func(arg):
@@ -35,14 +35,14 @@ def new_func(arg):
 **add(\*attrs, \*\*kattrs)**  
 _apply()_ without merge.
 
-**merge(\*attrs, \*\*kattrs)**
+**merge(\*attrs, \*\*kattrs)**  
 _apply()_ with merge.
 
 **auto(merge=True, types=object)**  
 Will automatically apply all non-private attributes of the source to the target.  
 _types_ will filter the attributes automatically applied to those that are instances provided, as per _isinstance()_
 
-**apply(attrs, kattrs, merge=False)**
+**apply(attrs, kattrs, merge=False)**  
 Any attrs with a *\_\_name__* attribute will be applied to the target with that as their attribute name.  
 Any values provided as attrs will be fetched from the provided source and applied to the target.  
 Any values provided as kattrs will be applied directly to the target with the name specified.  
