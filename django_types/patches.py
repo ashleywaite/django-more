@@ -1,19 +1,15 @@
-
-import logging
+""" Container classes for methods and attributes to be patched into django """
 from contextlib import suppress
 from django.utils.functional import cached_property
 # Project imports
-from patchy import patchy, super_patchy
+from patchy import super_patchy
 from django.db.migrations.state import StateApps as DjangoStateApps
-
-logger = logging.getLogger(__name__)
 
 
 # Make types available via StateApps (not regular Apps)
-class StateApps(DjangoStateApps):
+class StateApps:
     def __init__(self, *args, db_types=None, **kwargs):
         self.db_types = db_types or {}
-        #print('StateApps for db_types')
         super_patchy(*args, **kwargs)
 
 
@@ -111,17 +107,3 @@ class BaseDatabaseSchemaEditor:
             ),
             [],
         )
-
-
-def patch_types():
-    logger.info('Applying django_types patches')
-
-    # Patch migration classes to statefully apply types
-    with patchy('django.db.migrations.state') as p:
-        p.cls('ProjectState', ProjectState).auto()
-        p.cls('StateApps', StateApps).auto()
-
-    # Patch backend classes to allow parametised db_types
-    with patchy('django.db.backends.base.schema.BaseDatabaseSchemaEditor', BaseDatabaseSchemaEditor) as c:
-        c.auto()
-        c.add('_alter_column_type_sql')
