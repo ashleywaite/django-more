@@ -127,14 +127,14 @@ class PatchBase:
             if hasattr(attr, "__name__"):
                 kattrs[attr.__name__] = attr
             else:
-                kattrs[attr] = getattr(self.source, attr)
+                kattrs[attr] = inspect.getattr_static(self.source, attr)
         for attr, value in kattrs.items():
             old_value = inspect.getattr_static(self.target, attr, None)
             # If callable, preserve old func
             if callable(value) and callable(old_value):
                 # Prevent duplicate patching
                 if value in patchy_records:
-                    return
+                    continue
                 patchy_records[value] = old_value
 
             # Merge collections and classes instead of replacing
@@ -237,19 +237,6 @@ class PatchClass(PatchBase):
 
     def mod(self):
         return self.target.__module__
-
-    # Replacing
-    def add_desc(self, *attrs, **kattrs):
-        for attr, value in kattrs.items():
-            setattr(self.target, attr, value)
-        for attr in attrs:
-            # Treat objects as assigned to their name
-            if hasattr(attr, "__name__"):
-                (attr, value) = (attr.__name__, attr)
-            else:
-                value = self.source.__dict__[attr]
-            old_val = self.target.__dict__.get(attr, None)
-            setattr(self.target, attr, value)
 
     def get_auto_attrs(self, source=None, exclude_hidden=True):
         # Only auto attributes, locally declared objects, or hiddens in allow
