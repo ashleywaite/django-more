@@ -41,8 +41,8 @@ _apply()_ without merge.
 _apply()_ with merge.
 
 **auto(merge=True, types=object)**  
-Apply non-private (startswith('\_')) locally declared objects (hasattr('\_\_module__')) such as functions and classes) of the source to the target. Also applies any attribute (regardless of type) in the _instance.allow_ set.
-_(class patching)_ Also apply all primative attributes. Default _allow_ includes {'\_\_init__', '\_\_new__'}
+Apply non-private (startswith('\_')) locally declared objects (hasattr('\_\_module__')) such as functions and classes) of the source to the target. Also applies any attribute (regardless of type) in the _instance.allow_ set.  
+_(class patching)_ Also apply all primative attributes. Default _allow_ includes {'\_\_init__', '\_\_new__'}  
 _(module patching)_ Default _allow_ includes {'\_\_all__'}
 
 **apply(attrs, kattrs, merge=False)**  
