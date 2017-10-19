@@ -1,5 +1,5 @@
 from django.apps import AppConfig
-from .patch import patch_cte
+from . import patch_cte
 
 class DjangoCTEConfig(AppConfig):
     name = 'django_cte'
