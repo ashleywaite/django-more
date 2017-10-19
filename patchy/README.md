@@ -49,7 +49,7 @@ _(module patching)_ Default _allow_ includes {'\_\_all__'}
 Any attrs with a *\_\_name__* attribute will be applied to the target with that as their attribute name.  
 Any values provided as attrs will be fetched from the provided source and applied to the target.  
 Any values provided as kattrs will be applied directly to the target with the name specified.  
-Merge will attempt to combine collections instead of replacing them.
+Merge will attempt to combine collections and _auto()_ patch classes instead of replacing them.
 
 **cls(target, source=None)** (modules only)  
 Get a patchy instance for the specified class, relative to the module being patched.  
