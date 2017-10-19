@@ -6,7 +6,15 @@ from django.db.models import BLANK_CHOICE_DASH
 from django.core.exceptions import ValidationError
 from django_types import CustomTypeField, DBType
 
-__all__ = ['EnumField']
+__all__ = ['EnumField', 'enum_meta']
+
+
+def enum_meta(meta):
+    """ Turn the meta class into a simplistic descriptor.
+        This prevents the Meta class from being picked up as a member of the Enum
+    """
+    meta.__get__ = lambda: self
+    return meta
 
 
 class EnumField(CustomTypeField):

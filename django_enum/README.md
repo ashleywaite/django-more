@@ -12,12 +12,17 @@ Sample:
 ```python
 from django.db import models
 from enum import Enum
-from django_enum import EnumField
+from django_enum import EnumField, enum_meta
 
 class DaysEnum(Enum):
   MON = 'Monday'
   TUE = 'Tuesday'
   WED = 'Wednesday'
+
+  @enum_meta
+  class Meta:
+      db_type = 'my_type'
+      app_label = 'my_app'
 
 class MyModel(models.Model):
   day = EnumField(DaysEnum)
@@ -29,6 +34,10 @@ MyModel.objects.filter(day='Monday')
 ```
 
 Where the database supports enum types they will be used, by declaring types and modifying them (postgres), modifying the field types inline (mysql) or defaulting to a character field if there's no database support.
+
+**enum_meta** decorator is used to hide the _Meta_ class from being included as a member of the Enum.
+
+**Meta class** If provided allows you to specify the app_label and/or the name of the database type you wish to use instead of having them be automatically generated.
 
 
 ## Django patches
@@ -45,7 +54,7 @@ Added questions for how to handle changes to enums.
 **MigrationAutoDetector** (django.db.migrations.autodetector.MigrationAutoDetector)  
 Added method to detect changes in enums and generate operations for them.
 Currently hooked into the start of _generate_created_models()_ as enum types must be declared before used in a new model.
- 
+
 **BaseDatabaseFeatures** (django.db.backends.base.features.BaseDatabaseFeatures  
 Added feature flags for enums.
 
