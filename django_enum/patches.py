@@ -1,20 +1,13 @@
-import sys
+""" Container classes for methods and attributes to be patched into django """
 from enum import Enum
-import logging
 # Framework imports
-import django
 from django.db import models
-from django.conf import settings
 # Project imports
-from patchy import patchy, super_patchy
+from patchy import super_patchy
 from django_types import find_fields
 from .operations import CreateEnum, RemoveEnum, RenameEnum, AlterEnum, enum_state
 from .fields import EnumField
 
-
-logger = logging.getLogger(__name__)
-
-# Containers for patched methods added with patchy
 
 class MigrationQuestioner:
     def ask_rename_enum(self, old_enum_key, new_enum_key, enum_set):
@@ -154,35 +147,3 @@ class MigrationAutodetector:
     def generate_created_models(self):
         self.detect_enums()
         super_patchy()
-
-
-def patch_enum():
-    # Patch migrations classes
-    logger.info('Applying django_enum patches')
-
-    # If django_types not applied, do so
-    from django.db.migrations.state import ProjectState as DjangoProjectState
-    if not hasattr(DjangoProjectState, 'add_type'):
-        from django_types.patch import patch_types
-        patch_types()
-
-    with patchy('django.db.migrations') as p:
-        # ask_rename_enum
-        p.cls('questioner.MigrationQuestioner', MigrationQuestioner).auto()
-        p.cls('questioner.InteractiveMigrationQuestioner', InteractiveMigrationQuestioner).auto()
-        # detect_enums
-        p.cls('autodetector.MigrationAutodetector', MigrationAutodetector).auto()
-
-    # Patch backend features
-    with patchy('django.db.backends') as p:
-        # Add base changes necessary
-        p.cls('base.features.BaseDatabaseFeatures', BaseDatabaseFeatures).auto()
-
-        # Only patch database backends in use (avoid dependencies)
-        for backend in set(db_dict['ENGINE'] for db_name, db_dict in settings.DATABASES.items()):
-            if backend == 'django.db.backends.postgresql':
-                p.cls('postgresql.features.DatabaseFeatures', PostgresDatabaseFeatures).auto()
-                p.cls('postgresql.schema.DatabaseSchemaEditor', PostgresDatabaseSchemaEditor).auto()
-            if backend == 'django.db.backends.mysql':
-                import django.db.backends.mysql.base
-                p.cls('mysql.features.DatabaseFeatures', MysqlDatabaseFeatures).auto()
