@@ -30,11 +30,9 @@ TEMPLATES = [
     },
 ]
 
-DATABASES = {
-    'default': {
+DATABASE_ENGINES = {
+    'sqlite': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': 'test_django_more.sqllite3',
-        'TEST': {'NAME': 'test_django_more.sqllite3'},
     },
     'postgresql': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -55,6 +53,11 @@ DATABASES = {
     },
 }
 
+# Use database dependant on ENV
+DATABASES = {
+    'default': DATABASE_ENGINES[os.getenv('USING_DB_ALIAS')]
+}
+
 LOGGING = {
     'version': 1,
     'formatters': {
@@ -72,7 +75,7 @@ LOGGING = {
     'loggers': {
         'patchy': {
             'handlers': ['console'],
-            'level': 'INFO',
+            'level': 'WARN',
         },
     },
 }
