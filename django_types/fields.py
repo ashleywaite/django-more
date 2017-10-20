@@ -42,8 +42,8 @@ class CustomTypeField(models.Field):
         'vendor': 'db_type_format'
     }
 
-    def __init__(self, type_name=None, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, *args, type_name=None, **kwargs):
+        super().__init__(*args, **kwargs)
         if type_name:
             self.type_name = type_name
 
