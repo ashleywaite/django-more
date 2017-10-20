@@ -96,8 +96,13 @@ class EnumFieldTest(TestCase):
 
     def test_default_choices(self):
         field = EnumField(TestEnum)
+        choices = field.get_choices(blank_choice=BLANK_CHOICE_DASH)
+        expected = BLANK_CHOICE_DASH + [(em, em.value) for em in TestEnum]
+        self.assertEqual(choices, expected)
 
-        self.assertEqual(
-            field.get_choices(blank_choice=BLANK_CHOICE_DASH),
-            BLANK_CHOICE_DASH + [(em, em.value) for em in TestEnum]
-        )
+    def test_manual_choices(self):
+        members = [TestEnum.VAL1, TestEnum.VAL2]
+        field = EnumField(TestEnum, choices=members)
+        choices = field.get_choices(blank_choice=BLANK_CHOICE_DASH)
+        expected = BLANK_CHOICE_DASH + [(em, em.value) for em in members]
+        self.assertEqual(choices, expected)
