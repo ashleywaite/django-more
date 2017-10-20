@@ -33,6 +33,7 @@ TEMPLATES = [
 DATABASE_ENGINES = {
     'sqlite': {
         'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': 'test_django_more.sqlite3',
     },
     'postgresql': {
         'ENGINE': 'django.db.backends.postgresql',
