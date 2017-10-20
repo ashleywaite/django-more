@@ -1,4 +1,4 @@
-""" Define custom index types useful for SID and utils """
+""" Define custom index types """
 
 import hashlib
 from django.db.models import Index, Q
