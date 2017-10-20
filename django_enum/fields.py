@@ -69,15 +69,20 @@ class EnumField(CustomTypeField):
     def to_python(self, value):
         if value is None or isinstance(value, self.type_def):
             return value
-        with suppress(ValueError):
-            return self.type_def(str(value))
-        # Enum match failed, if not case_sensitive, try insensitive scan
-        if self.case_sensitive is False:
-            for em in self.type_def:
-                if str(value).lower() == em.value.lower():
-                    return em
-        raise ValidationError("Invalid value '{}' not in enumeration {}".format(
-            value, [em.value for em in self.type_def]))
+        if isinstance(value, Enum):
+            # Enum member of the wrong type!
+            raise ValidationError("Invalid enum '{}' is a member of an incompatible enumeration".format(repr(value)))
+        if isinstance(value, str):
+            with suppress(ValueError):
+                return self.type_def(str(value))
+            # Enum match failed, if not case_sensitive, try insensitive scan
+            if self.case_sensitive is False:
+                for em in self.type_def:
+                    if str(value).lower() == em.value.lower():
+                        return em
+            raise ValidationError("Invalid value '{}' not in enumeration {}".format(
+                value, [em.value for em in self.type_def]))
+        raise ValidationError("Invalid type '{}' is not an enum member or string".format(type(value).__name__))
 
     def get_prep_value(self, value):
         if not value:

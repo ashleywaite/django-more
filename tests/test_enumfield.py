@@ -63,9 +63,17 @@ class EnumFieldTest(TestCase):
                 TestEnum.VAL3: TestEnum.VAL3},
             invalid={
                 'The invalid value': 'not in enumeration',
-                123: 'not in enumeration',
-                WrongEnum.VAL1: 'not in enumeration',
-                WrongEnum.VAL3: 'not in enumeration'},
+                'VAL1': 'not in enumeration',
+                'VAL2': 'not in enumeration',
+                '': 'not in enumeration',
+                'None':  'not in enumeration',
+                WrongEnum.VAL1: 'incompatible enumeration',
+                WrongEnum.VAL3: 'incompatible enumeration',
+                1: 'not an enum member or string',
+                -5:  'not an enum member or string',
+                123: 'not an enum member or string',
+                (): 'not an enum member or string',
+                None: 'cannot be null'},
             field_args=[TestEnum])
 
     def test_meta_not_member(self):
@@ -88,9 +96,9 @@ class EnumFieldTest(TestCase):
                 'ThirD vaLue IS the bEst': TestEnum.VAL3},
             invalid={
                 'The invalid value': 'not in enumeration',
-                123: 'not in enumeration',
-                WrongEnum.VAL1: 'not in enumeration',
-                WrongEnum.VAL3: 'not in enumeration'},
+                123: 'not an enum member or string',
+                WrongEnum.VAL1: 'incompatible enumeration',
+                WrongEnum.VAL3: 'incompatible enumeration'},
             field_args=[TestEnum],
             field_kwargs={'case_sensitive': False})
 
