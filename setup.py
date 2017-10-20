@@ -1,5 +1,14 @@
 from setuptools import setup
 
+
+test_deps = [
+    'psycopg2',
+    'mysqlclient',
+]
+extras = {
+    'test': test_deps,
+}
+
 setup(
     name='django-more',
     version='0.1',
@@ -12,9 +21,12 @@ setup(
         'django_more',
         'django_more.storages',
         'django_cte',
-        'django_enum'
+        'django_enum',
     ],
     install_requires=[
-        'django'
-    ]
+        'django',
+    ],
+    test_suite = 'tests.runtests.runtests',
+    tests_require=test_deps,
+    extras_require=extras,
 )
