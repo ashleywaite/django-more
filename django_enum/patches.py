@@ -102,9 +102,8 @@ class MigrationAutodetector:
                     if self.questioner.ask_rename_enum(db_type, rem_db_type, enum_set):
                         self.add_operation(
                             self.to_state.db_types[db_type].Meta.app_label,
-                            RenameEnum(
-                                old_type=rem_db_type,
-                                new_type=db_type))
+                            RenameEnum(old_type=rem_db_type, new_type=db_type),
+                            beginning=True)
                         del old_enum_sets[rem_db_type]
                         del new_enum_sets[db_type]
                     break
@@ -113,16 +112,15 @@ class MigrationAutodetector:
         for db_type, values in new_enum_sets.items():
             self.add_operation(
                 self.to_state.db_types[db_type].Meta.app_label,
-                CreateEnum(
-                    db_type=db_type,
-                    values=list(values)))
+                CreateEnum(db_type=db_type, values=list(values)),
+                beginning=True)
 
         # Remove old enums
         for db_type in old_enum_sets:
             self.add_operation(
                 self.from_state.db_types[db_type].Meta.app_label,
-                RemoveEnum(
-                    db_type=db_type))
+                RemoveEnum(db_type=db_type),
+                beginning=True)
 
         # Does not detect renamed values in enum, that's a remove + add
         existing_enum_sets = {k: (
@@ -141,9 +139,10 @@ class MigrationAutodetector:
                     paras['add_values'] = added
                 self.add_operation(
                     self.from_state.db_types[db_type].Meta.app_label,
-                    AlterEnum(**paras))
+                    AlterEnum(**paras),
+                    beginning=True)
 
-    # Must do before models, so inject detect_enums via here
-    def generate_created_models(self):
+    # Better to do after model creation and then inject operations at front of list
+    def generate_created_models(self, *args, **kwargs):
+        super_patchy(*args, **kwargs)
         self.detect_enums()
-        super_patchy()
