@@ -94,9 +94,7 @@ class BaseDatabaseSchemaEditor:
 
     def _alter_column_type_sql(self, model, old_field, new_field, new_type):
         """ Test for a parametised type and treat appropriately """
-        print('ALTER')
         new_type, params = self.column_sql_paramatized(new_type)
-        print('alter', new_type, 'with', params)
         return (
             (
                 self.sql_alter_column_type % {
