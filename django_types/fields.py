@@ -115,8 +115,8 @@ class CustomTypeField(models.Field):
     def db_type(self, connection):
         # Attempt local lookup
         type_format = self.data_types.get(connection.vendor) or self.data_types.get('unknown')
-        if isinstance(type_format, models.Field):
-            type_format = connection.data_types[type_string.__name__]
+        if isinstance(type_format, type):
+            type_format = connection.data_types[type_format.__name__]
         if not type_format:
             type_format = super().db_type(connection)
 
