@@ -15,12 +15,8 @@ def patch_types():
 
     # Patch migration classes to statefully apply types
     with patchy('django.db', 'django_types.patches') as p:
-        with p.cls('migrations.state.ProjectState') as c:
-            c.auto()
-            c.add('apps')
+        p.cls('migrations.state.ProjectState').auto(allow={'apps'})
         p.cls('migrations.state.StateApps').auto()
 
         # Patch backend classes to allow parametised db_types
-        with p.cls('backends.base.schema.BaseDatabaseSchemaEditor') as c:
-            c.auto()
-            c.add('_alter_column_type_sql')
+        p.cls('backends.base.schema.BaseDatabaseSchemaEditor').auto(allow={'_alter_column_type_sql'})

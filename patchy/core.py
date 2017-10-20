@@ -98,7 +98,7 @@ patchy_records = PatchyRecords()
 
 
 class PatchBase:
-    allow = {}
+    allow = set()
 
     def __enter__(self):
         return self
@@ -106,10 +106,14 @@ class PatchBase:
     def __exit__(self, exc_type, exc_value, traceback):
         pass
 
-    def auto(self, source=None, *, merge=True):
+    def auto(self, source=None, *, allow=None, only_allow=None, merge=True):
         """ Apply all attributes of from source to target.
             Defaults to merging collections.
         """
+        if only_allow:
+            self.allow = only_allow
+        elif allow:
+            self.allow = self.allow | allow
         attrs = self.get_auto_attrs(source or self.source)
         self.apply(dict(attrs), merge=merge)
 
@@ -243,4 +247,5 @@ class PatchClass(PatchBase):
         return ((attr, val)
             for attr, val in self.get_attrs(source, exclude_hidden)
                 if not hasattr(val, '__module__')
-                or val.__module__ == source.__module__)
+                or val.__module__ == source.__module__
+                or attr in self.allow)
