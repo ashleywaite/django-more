@@ -61,11 +61,10 @@ class CustomTypeField(models.Field):
             raise TypeError('type_def must be a subclass of {}'.format(self.type_def_subclass))
 
         # Import meta options from type_def
-        if 'Meta' in type_def:
-            if 'db_type' in type_def.Meta:
-                self.type_name = type_def.Meta.db_type
-            if 'app_label' in type_def.Meta:
-                self.type_app_label = type_def.Meta.app_label
+        with suppress(AttributeError):
+            self.type_name = type_def.Meta.db_type
+        with suppress(AttributeError):
+            self.type_app_label = type_def.Meta.app_label
 
         if not self.type_app_label:
             # Determine app_label of enum being used
