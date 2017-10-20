@@ -29,10 +29,10 @@ class EnumField(CustomTypeField):
         'mysql': 'enum(%(values)s)',
     }
 
-    def __init__(self, enum=None, case_sensitive=None, **kwargs):
-        super().__init__(**kwargs)
-        if kwargs.get('choices', False):
-            self.manual_choices = True
+    def __init__(self, enum=None, case_sensitive=None, *args, **kwargs):
+        if 'choices' in kwargs:
+            self.manual_choices = kwargs.pop('choices')
+        super().__init__(*args, **kwargs)
         if enum:
             self.type_def = enum
         if case_sensitive is not None:
@@ -43,13 +43,13 @@ class EnumField(CustomTypeField):
     def type_def(self, enum):
         CustomTypeField.type_def.fset(self, enum)
 
-        # Allow enum members as choices
+        # Allow flat list of enum members for choices
         if self.manual_choices:
             self.choices = [
-                (choice.name, choice.value) if isinstance(choice, self.type_def) else choice
-                for choice in self.choices]
+                (choice, choice.value) if isinstance(choice, self.type_def) else choice
+                for choice in self.manual_choices]
         else:
-            self.choices = [(em.name, em.value) for em in self.type_def]
+            self.choices = [(em, em.value) for em in self.type_def]
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
@@ -85,11 +85,6 @@ class EnumField(CustomTypeField):
         if not isinstance(value, self.type_def):
             value = self.to_python(value)
         return value.value
-
-    def get_choices(self, include_blank=True, blank_choice=BLANK_CHOICE_DASH, limit_choices_to=None):
-        if self.choices is True:
-            return [(em.name, em.value) for em in self.type_def]
-        return super().get_choices(include_blank, blank_choice, limit_choices_to)
 
     def db_type_parameters(self, connection):
         paras = super().db_type_parameters(connection)
