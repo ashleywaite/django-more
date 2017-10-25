@@ -35,9 +35,24 @@ MyModel.objects.filter(day='Monday')
 
 Where the database supports enum types they will be used, by declaring types and modifying them (postgres), modifying the field types inline (mysql) or defaulting to a character field if there's no database support.
 
+### Field options
+
+**choices** follows the typical convention of (value, display) tuples, where the value can be the enum member or text value of it. Using this syntax grouped choices can be displayed.  
+_eg. No Wednesday choice, choices=[(DaysEnum.MON, 'Monday'), (DaysEnum.TUE, 'Tuesday')]_
+
+It also allows for enum members to be used at the top level of the list, which will be automatically replaced with (enum_member, enum_value) for convenience.  
+_eg. No Wednesday choice, choices=[DaysEnum.MON, DaysEnum.TUE]_
+
+**on_delete** defines the behaviour for when an enum value is removed from the definition, and follows the same conventions as the foreign key on_delete.  
+_eg. Prevent migration if any records have removed value, on_delete=models.PROTECT_
+
+This behaviour can be overridden when making a migration, as it will confirm the behaviour to apply.
+
+### Enum class options
+
 **enum_meta** decorator is used to hide the _Meta_ class from being included as a member of the Enum.
 
-**Meta class** If provided allows you to specify the app_label and/or the name of the database type you wish to use instead of having them be automatically generated.
+**Meta class** if provided allows you to specify the app_label and/or the name of the database type you wish to use instead of having them be automatically generated.
 
 
 ## Django patches
