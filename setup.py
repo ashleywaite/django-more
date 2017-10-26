@@ -20,7 +20,6 @@ setup(
         'patchy',
         'django_more',
         'django_more.storages',
-        'django_cte',
         'django_enum',
     ],
     install_requires=[

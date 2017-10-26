@@ -14,6 +14,8 @@ Extras for Django that do not require any patching and can be used directly.
 
 ## django_cte
 
+**Currently in WIP state and not included in distribution**
+
 Patches Django to add CTE based functionality.
 * django_cte.patch_cte()
 
