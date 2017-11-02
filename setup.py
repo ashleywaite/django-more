@@ -29,6 +29,7 @@ setup(
         'django_more.storages',
         'django_cte',
         'django_enum',
+        'django_types',
     ],
     install_requires=[
         'django',
