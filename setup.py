@@ -1,6 +1,12 @@
 from setuptools import setup
 
 
+try:
+    import pypandoc
+    long_description = pypandoc.convert('README.md', 'rst')
+except(IOError, ImportError):
+    long_description = open('README.md').read()
+
 test_deps = [
     'psycopg2',
     'mysqlclient',
@@ -15,7 +21,7 @@ setup(
     author='Ashley Waite',
     author_email='ashley.c.waite@gmail.com',
     description='Django with more',
-    long_description=open('README.md').read(),
+    long_description=long_description,
     url='https://github.com/ashleywaite/django-more',
     packages=[
         'patchy',
@@ -28,7 +34,7 @@ setup(
         'django',
     ],
     python_requires='>=3.4',
-    test_suite = 'tests.runtests.runtests',
+    test_suite='tests.runtests.runtests',
     tests_require=test_deps,
     extras_require=extras,
     license='BSD',
