@@ -11,7 +11,7 @@ extras = {
 
 setup(
     name='django-more',
-    version='0.1',
+    version='0.1.1',
     author='Ashley Waite',
     author_email='ashley.c.waite@gmail.com',
     description='Django with more',
@@ -22,6 +22,7 @@ setup(
         'django_more',
         'django_more.storages',
         'django_enum',
+        'django_types',
     ],
     install_requires=[
         'django',
