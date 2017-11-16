@@ -28,9 +28,12 @@ class EnumField(CustomTypeField):
         'mysql': 'enum(%(values)s)',
     }
 
-    def __init__(self, enum=None, case_sensitive=None, *args, **kwargs):
+    def __init__(self, enum=None, case_sensitive=None, default=None, *args, **kwargs):
         if 'choices' in kwargs:
             self.manual_choices = kwargs.pop('choices')
+        if default and enum:
+            # Stringify default
+            kwargs['default'] = default.value if isinstance(default, enum) else default
         super().__init__(*args, **kwargs)
         if enum:
             self.type_def = enum
