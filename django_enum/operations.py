@@ -1,5 +1,6 @@
 
 from enum import Enum
+from operator import attrgetter
 
 from django.db import models
 from django.db.models import sql

@@ -2,7 +2,7 @@
 from django.core.exceptions import ValidationError
 from django.db import models
 
-from .hashing import b16len, b64len, b64max, HashString
+from ..hashing import b16len, b64len, b64max, HashString
 
 
 __all__ = ['HashField']
