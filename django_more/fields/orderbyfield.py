@@ -41,3 +41,5 @@ class OrderByField(UniqueForFieldsMixin, models.IntegerField):
             # Hackishly clip group_by clause to guarantee single result
             qs.query.group_by = []
             return BypassExpression(Coalesce(Subquery(qs), 1, output_field=models.IntegerField()))
+        else:
+            return super().pre_save(model_instance, add)
