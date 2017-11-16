@@ -126,7 +126,7 @@ class RemoveEnum(EnumOperation):
 
     def state_forwards(self, app_label, state):
         # TODO Add dependency checking and cascades
-        state.remove_type(db_type)
+        state.remove_type(self.db_type)
 
     def database_forwards(self, app_label, schema_editor, from_state, to_state):
         if schema_editor.connection.features.requires_enum_declaration:
@@ -220,7 +220,7 @@ class AlterEnum(EnumOperation):
 
         # Get field/model list
         fields = [
-            (from_model, to_model, from_field, self.on_delete or field.on_delete)
+            (from_model, to_model, from_field, self.on_delete or from_field.on_delete)
             for info in self.get_fields(from_state)
             for from_model in [from_state.apps.get_model(info.model_app_label, info.model_name)]
             for from_field in [from_model._meta.get_field(info.field_name)]
