@@ -1,7 +1,9 @@
 """ Declare custom Django fields """
-
+from django.core.exceptions import ValidationError
 from django.db import models
-from .hashing import HashString, b64len, b16len, b64max
+
+from .hashing import b16len, b64len, b64max, HashString
+
 
 __all__ = ['HashField']
 
