@@ -17,7 +17,7 @@ extras = {
 
 setup(
     name='django-more',
-    version='0.2',
+    version='0.2.0',
     author='Ashley Waite',
     author_email='ashley.c.waite@gmail.com',
     description='Django with more',
@@ -26,8 +26,8 @@ setup(
     packages=[
         'patchy',
         'django_more',
+        'django_more.fields',
         'django_more.storages',
-        'django_cte',
         'django_enum',
         'django_types',
     ],

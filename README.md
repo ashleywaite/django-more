@@ -10,6 +10,7 @@ Extras for Django that do not require any patching and can be used directly.
  * *django_more.storages*
  * *django_more.PartialIndex*
  * *django_more.HashField*
+ * *django_more.OrderByField*
 
 
 ## django_cte
@@ -17,6 +18,7 @@ Extras for Django that do not require any patching and can be used directly.
 Patches Django to add CTE based functionality.
 * django_cte.patch_cte()
 
+**Not included in distributions until out of WIP state**  
 _Placing django_cte into Django INSTALLED_APPS will automatically invoke patch_cte()_
 
 
@@ -43,3 +45,23 @@ _To avoid additional dependencies in INSTALLED_APPS, apps adding types requiring
 A class based monkey patching package used by the other django_more packages to apply their patches in a consistent and safe manner that is hopefully less fragile to Django core changes.
 * patchy.patchy()
 * patchy.super_patchy()
+
+
+# Version History
+
+*0.2.0*  
+Added documentation for _django_more_ features in _README_.
+Refactored _django_more.fields_ into sub-module.
+Added:  
+ * django_more.OrderByField
+
+*0.1.1*  
+Bugfix to include _django_types_ in distribution as necessary for _django_enum_.
+
+*0.1.0*  
+Initial release without _django_cte_.  
+Added:  
+ * django_enum.EnumField
+ * django_more.PartialIndex
+ * django_more.HashField
+ * django_more.storages
