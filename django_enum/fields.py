@@ -1,9 +1,8 @@
 from contextlib import suppress
 from enum import Enum
 
-from django.db import models
-from django.db.models import BLANK_CHOICE_DASH
 from django.core.exceptions import ValidationError
+from django.db import models
 from django_types import CustomTypeField, DBType
 
 __all__ = ['EnumField', 'enum_meta']
@@ -13,7 +12,7 @@ def enum_meta(meta):
     """ Turn the meta class into a simplistic descriptor.
         This prevents the Meta class from being picked up as a member of the Enum
     """
-    meta.__get__ = lambda: self
+    meta.__get__ = lambda: self  # noqa self being undeclared is fine
     return meta
 
 

@@ -1,13 +1,12 @@
 
-from math import ceil
 from base64 import b64encode, b16encode, b64decode, b16decode
-
+from math import ceil
 
 __all__ = [
     "b64max",
     "b64len",
     "b64from16",
-    "b64from256"
+    "b64from256",
     "b16len",
     "b16max",
     "b16from64",

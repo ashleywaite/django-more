@@ -1,5 +1,4 @@
 """ Import sugar for django """
-
 # System imports
 import sys
 from functools import lru_cache

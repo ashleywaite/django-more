@@ -2,10 +2,9 @@
 
 import logging
 import inspect
-from types import MethodType, ModuleType, FunctionType
+from types import MethodType, ModuleType
 from collections import abc
 from importlib import import_module
-from importlib.util import find_spec
 from contextlib import suppress
 
 __all__ = ['patchy', 'super_patchy']
@@ -94,6 +93,7 @@ class PatchyRecords(dict):
             key = key.__code__
         return super().__contains__(id(key))
 
+
 patchy_records = PatchyRecords()
 
 
@@ -172,11 +172,12 @@ class PatchBase:
         # Get all attributes, except hidden if exclude_hidden
         # but allowing whitelisted attributes (like __all__)
         source = source or self.source
-        return ((attr, val)
+        return (
+            (attr, val)
             for attr, val in source.__dict__.items()
-                if attr in self.allow
-                or not exclude_hidden
-                or not attr.startswith('_'))
+            if attr in self.allow
+            or not exclude_hidden
+            or not attr.startswith('_'))
 
 
 class PatchModule(PatchBase):
@@ -212,7 +213,6 @@ class PatchModule(PatchBase):
             source = resolve(source, package=self.source.__name__)
 
         elif source is None:
-            #parent = import_module('..', package=self.source.__name__)
             # Deal with nested modules in a pack
             # Test for corresponding module relative to current source
             source_name = target.__name__.replace('.', self.module_sep)
@@ -226,10 +226,11 @@ class PatchModule(PatchBase):
 
     def get_auto_attrs(self, source=None, exclude_hidden=True):
         # Only auto locally declared objects, or attributes in allow
-        return ((attr, val)
+        return (
+            (attr, val)
             for attr, val in self.get_attrs(source, exclude_hidden)
-                if (hasattr(val, '__module__') and val.__module__ == source.__name__)
-                or attr in self.allow)
+            if (hasattr(val, '__module__') and val.__module__ == source.__name__)
+            or attr in self.allow)
 
 
 class PatchClass(PatchBase):
@@ -244,8 +245,9 @@ class PatchClass(PatchBase):
 
     def get_auto_attrs(self, source=None, exclude_hidden=True):
         # Only auto attributes, locally declared objects, or hiddens in allow
-        return ((attr, val)
+        return (
+            (attr, val)
             for attr, val in self.get_attrs(source, exclude_hidden)
-                if not hasattr(val, '__module__')
-                or val.__module__ == source.__module__
-                or attr in self.allow)
+            if not hasattr(val, '__module__')
+            or val.__module__ == source.__module__
+            or attr in self.allow)

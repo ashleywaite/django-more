@@ -1,5 +1,4 @@
 """ Container classes for methods and attributes to be patched into django """
-from contextlib import suppress
 from django.utils.functional import cached_property
 # Project imports
 from patchy import super_patchy

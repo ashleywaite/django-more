@@ -1,5 +1,4 @@
 
-import sys
 import logging
 # Framework imports
 from django.conf import settings

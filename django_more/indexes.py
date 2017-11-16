@@ -1,6 +1,4 @@
 """ Define custom index types """
-
-import hashlib
 from django.db.models import Index, Q
 from django.db import DEFAULT_DB_ALIAS
 

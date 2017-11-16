@@ -10,6 +10,7 @@ __all__ = ['CustomTypeOperation', 'find_fields']
 
 field_info = namedtuple('fielddetail', ['model_state', 'model_app_label', 'model_name', 'field', 'field_name', 'field_index'])
 
+
 def find_fields(state, db_type=None, field_type=None):
     field_type = field_type or CustomTypeField
     # Scan state for custom types in use
@@ -18,7 +19,7 @@ def find_fields(state, db_type=None, field_type=None):
         for (model_app_label, model_name), model_state in state.models.items()
         for field_index, (field_name, field) in enumerate(model_state.fields)
         if isinstance(field, field_type)
-            and (field.type_name == db_type or not db_type))
+        and (field.type_name == db_type or not db_type))
 
 
 class CustomTypeOperation(Operation):
