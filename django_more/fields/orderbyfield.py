@@ -17,12 +17,13 @@ class OrderByField(UniqueForFieldsMixin, models.IntegerField):
             raise ValueError('OrderByField may not have a default value')
         if 'unique' in kwargs:
             raise ValueError('OrderByField may not be explicitly declared unique')
-        super().__init__(*args, unique=True, **kwargs)
+        super().__init__(*args, unique=True, default=None, **kwargs)
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
         # Remove unique from field definition
         kwargs.pop('unique', None)
+        kwargs.pop('default', None)
         return name, path, args, kwargs
 
     def pre_save(self, model_instance, add):
