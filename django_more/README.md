@@ -1,5 +1,5 @@
 # django_more
-A collection of fields and utilities to extend the functionality of Django that have no additional external dependencies.
+A collection of fields and classes to extend the functionality of Django that have no additional external dependencies.
 
 ```python
 import hashlib
@@ -31,7 +31,9 @@ class Evidence(models.Model):
 [HashString]: hashing.py "Link to source"
 [UniqueForFieldsMixin]: mixins.py "Link to source"
 [BypassExpression]: expressions.py "Link to source"
-
+[Options.order_with_respect_to]: https://docs.djangoproject.com/en/1.11/ref/models/options/#order-with-respect-to "Django documentation: Model options section for order_with_respect_to (1.11)"
+[Django field lookups]: https://docs.djangoproject.com/en/1.11/topics/db/queries/#field-lookups-intro "Django documentation: Field lookups intoduction (1.11)"
+[Django Q lookups]: https://docs.djangoproject.com/en/1.11/topics/db/queries/#complex-lookups-with-q-objects "Django documentation: Complex lookups with Q objects (1.11)"
 
 ## HashField
 [HashField][] represents a hash of any type, that is stored as base64 in the database, and can be directly compared to hashes in base16/hex, base64, and base256/raw.
@@ -58,23 +60,25 @@ Evidence(md5='9e107d9d372bb6826bd81d3542a419d6', sha256='d7a8fbb307d7809469ca9ab
 Evidence(md5='nhB9nTcrtoJr2B01QqQZ1g==', sha256='16j7swfXgJRpypq8sAguT41WUeRtPNt2LQLQvzfJ5ZI=', name='Book', location='Bedroom')
 ```
 
-#### bit_length = int
-Raw bit length of the hash, which then determines the appropriate base16 and base64 lengths.  
-ie, md5 is 128 bits, sha256 is 256 bits
-
-#### max_length = int
-Field size (ie, _max_length_ on _Charfield_) in bytes. This will default to be the size that will contain the base64 representation of the _bit_length_, but can be set to be larger to accommodate legacy data or longer atypical hashes.
+#### Class
+*   **HashField(bit_length=None, max_length=None)**  
+    Neither argument is required, but at least one must be.
+    *   **bit_length**: Raw bit length of the hash.  
+        If not provided, the maximum _bit_length_ will be determined that can fit inside the _max_length_.  
+        ie, md5 is 128 bits, sha256 is 256 bits.
+    *   **max_length**: Analogous to _max_length_ on _Charfield_.  
+        Field size in bytes. This will default to be the size that will contain the base64 representation of the _bit_length_, but can be set to be larger to accommodate legacy data or longer atypical hashes.
 
 
 ## OrderByField
-[OrderByField][] is a database constraint enforced field providing similar functionality to the Django _Meta.order_with_respect_to_ model option, which uses database expressions for incrementing instead of multiple queries.
+[OrderByField][] is a database constraint enforced field providing similar functionality to the Django _Options.order_with_respect_to_ model option, which uses database expressions for incrementing instead of multiple queries.
 
-It does not apply a Django _Meta.order_by_ to the model like _Meta.order_with_respect_to_ does, so query sets will not be ordered by this by default. Thus this field can be used to provide an ordering that does not affect queries and will not generate an _ORDER BY_ clause, but can be used for other purposes such as display.  
-As this is a concrete field, a _Meta.order_by_ can be specified on the model to add this behaviour. ie, `order_by = ('wrt_field_1', 'wrt_field_2', 'order_by_field')`
+It does not apply a Django _Options.order_by_ to the model like _Options.order_with_respect_to_ does, so query sets will not be ordered by this by default. Thus this field can be used to provide an ordering that does not affect queries and will not generate an _ORDER BY_ clause, but can be used for other purposes such as display.  
+As this is a concrete field, a _Options.order_by_ can be specified on the model to add this behaviour. ie, `order_by = ('wrt_field_1', 'wrt_field_2', 'order_by_field')`
 
 If _unique_for_fields_ is not specified it will instead default to being a _unique_ field, acting as an ordering for the entire model.
 
-If _unique_for_field_ is specified it will act similar to an _Meta.order_with_respect_to_ on those fields.
+If _unique_for_fields_ is specified it will act similar to an _Options.order_with_respect_to_ on those fields.
 
 The default value for the field will be one greater than the existing maximum value matching the ordering set.  
 Using `Count` can lead to duplicate values if records are deleted unless all records are renumbered to maintain contiguous numbering. To avoid necessitating this and allow this field to be filled on the database side, it's done via a `SubQuery` with `Max`, so record creation is a single database query and can be done in bulk.
@@ -92,26 +96,54 @@ rock.refresh_from_db()
 assert(rock.order == 11)
 ```
 
-#### unique_for_fields = [str, str, ...]
-The list of fields that should be used similar to _Meta.order_with_respect_to_.  
-All fields must be concrete as a _Meta.unique_together_ model option (for these fields and self) is generated to create the appropriate database constraint.
+#### Class
+*   **OrderByField(unique_for_fields=None, db_constraint=True)**
+    *   **unique_for_fields**: List of string field names that should be used similar to _Options.order_with_respect_to_.  
+        All fields must be concrete as a _Options.unique_together_ model option (for these fields and self) is generated to create the appropriate database constraint.
+    *   **db_constraint**: Whether this field will generate a database uniqueness constraint.  
+        This is done via the same mechanism as _Options.unique_together_ if _unique_for_fields_, or through _Field.unique_ if not.
+
+#### Model extras
+These methods are added to the model the field is declared in, and behave in the same way as those provided by Django [Options.order_with_respect_to][].
+*   **model.get_next_in_order()**  
+    Same behaviour as _Options.order_with_respect_to_.
+*   **model.get_previous_in_order()**  
+    Same behaviour as _Options.order_with_respect_to_.
+*   **model.get_FIELD_set()**  
+    Same behaviour as _Options.order_with_respect_to_.
+*   **model.set_FIELD_set(id_list, reset_values=False)**  
+    Same behaviour as _Options.order_with_respect_to_ with the addition of _reset_values_.
+    *   **id_list**: List of primary keys (or a queryset) that will be moved to the end of their ordering set in order.  
+        Has the effect of reordering all listed to match order specified.  
+    *   **reset_values**: Boolean to indicate whether to freshly renumber entire group from 0.  
+        Must be updating entire group to reset_values
+
+#### Reverse model extras
+These methods are added models linked to within the ordering fields. ie, any in _unique_for_fields_.  
+These can be used the same way as those provided by Django _Options.order_with_respect_to_.  
+*   **model.get_MODEL_set(limit_to=None)**  
+    Same behaviour as _Options.order_with_respect_to_ with the addition of _limit_to_.
+    *   **limit_to**: An instance of the target/ordered model that can be used to restrict the set to a single grouping.  
+        When using groupings that contain more than one foreign key coming from any single remote field will only cover one of those keys. The results will be grouped according to the _unique_for_fields_ order.  
+        By specifying an instance from the grouped model, the results can be restricted to only the grouping that instance is in.
+*   **model.set_MODEL_set(id_list, reset_values=False)**  
+    Same behaviour as _model.set_FIELD_set()_.
 
 
 ## PartialIndex
-[PartialIndex][] is an `Index` implementation allowing for partial indexes to be defined based upon Django filter or Q notation. Used within the _Meta.indexes_ option on a model.
+[PartialIndex][] is an `Index` implementation allowing for partial indexes to be defined based upon Django filter or Q notation. Used within the _Options.indexes_ option on a model.
 
+It behaves in the same way as [Django field lookups][], taking keyword arguments and `Q` objects as parameters to generate the clauses for the database index.  
+There's no equivalent of `QuerySet.exclude()` and other filtering functions, but most of these can be achieved with [Django Q lookups][], such as `~Q()` notation to exclude. 
 
-#### *args
-`Q` objects to restrict the index generated, same as for `QuerySet.filter()`
-
-#### fields = [str, str, ...]
-Same as for `Index`
-
-#### name = str
-Same as for `Index`
-
-#### **kwargs
-Keyword filters to restrict the index generated, same as for `QuerySet.filter()`
+#### Class
+*   **PartialIndex(\*args, fields=[], name=None, \*\*kwargs)**  
+    Very similar behaviour to 
+    *   **args**: `Q` objects to restrict the index generated, same as for `QuerySet.filter()`.
+    *   **fields**: List of fields to include in the index.
+    *   **name**: Name to use when creating the index on the database.  
+        If not provided, something will be generated for it.
+    *   **kwargs**: Keyword filters to restrict the index generated, same as for `QuerySet.filter()`
 
 
 # Utility Classes
@@ -127,26 +159,25 @@ Bytes representation is the base256 (raw) bytes of the hash itself, and not byte
 
 The `__hash__()` of all instances is based upon the base64 representation, so two instances generated from different representations of the same hash will hash to the same, such that `set` or `dict` operations will behave in an intuitive manner.
 
-#### HashField.from_b16(str)
-_classmethod_ that creates a new instance from a base16 string.
-
-#### HashField.from_b64(str)
-_classmethod_ that creates a new instance from a base64 string..
-
-#### HashField.from_b256(str)
-_classmethod_ that creates a new instance from a base256 string or raw hash in bytes.
+#### Class methods
+*   **HashString.from_b16(value)**  
+    *   **value**: Base16 string used to create a new instance.
+*   **HashString.from_b64(value)**  
+    *   **value**: Base64 string used to create a new instance.
+*   **HashString.from_b256(value)**  
+    *   **value**: Bytes or digest of a hash used to create a new instance.
 
 
 ## UniqueForFieldsMixin
 [UniqueForFieldsMixin][] with added to a field gives it an additional _unique_for_fields_ argument.
 
-When _unique_for_fields_ is provided, an additional database constraint is added via _Meta.unique_together_ for this field and all fields specified.
+When _unique_for_fields_ is provided, an additional database constraint is added via _Options.unique_together_ for this field and all fields specified.
 
-As a _Meta.unique_together_ completely covers the utility of the _unique_ field option, if _unique_for_fields_ is provided, it will remove _unique_ if set on the field.
+As a _Options.unique_together_ completely covers the utility of the _unique_ field option, if _unique_for_fields_ is provided, it will remove _unique_ if set on the field.
 
 
 ## BypassExpression
-[BypassExpression][] wraps an `Expression` in the same was as `ExpressionWrapper` but prevent validation from flagging the expression as containing column references or aggregates.
+[BypassExpression][] wraps an `Expression` in the same way as `ExpressionWrapper` but prevents validation from flagging the expression as containing column references or aggregates.
 
 Most useful to allow some expressions to be used in _INSERT_ statements that are otherwise rejected by Django for being too difficult to validate.  
 Without Django validating any references or aggregates within the expression, there are no warnings about these if they are invalid or cannot be resolved.
