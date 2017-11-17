@@ -1,3 +1,4 @@
+from functools import partial
 from functools import partialmethod
 from django.db import models
 from django.db.models import Case
@@ -6,6 +7,7 @@ from django.db.models import Q
 from django.db.models import Subquery
 from django.db.models import When
 from django.db.models.functions import Coalesce
+from django.db.models.fields.related import resolve_relation, make_model_tuple
 
 from ..expressions import BypassExpression
 from .mixins import UniqueForFieldsMixin
@@ -18,6 +20,8 @@ class OrderByField(UniqueForFieldsMixin, models.IntegerField):
     func_local_previous = 'get_previous_in_order'
     func_local_get_set = 'get_%(name)s_set'
     func_local_set_set = 'set_%(name)s_set'
+    func_remote_get_set = 'get_%(model)s_set'
+    func_remote_set_set = 'set_%(model)s_set'
 
     # Will use unique_for_fields if specified, otherwise unique by default
     def __init__(self, *args, **kwargs):
@@ -36,6 +40,44 @@ class OrderByField(UniqueForFieldsMixin, models.IntegerField):
         setattr(cls, self.func_local_previous % subs, partialmethod(self.get_next_or_previous_in_order, is_next=False))
         setattr(cls, self.func_local_get_set % subs, partialmethod(self.get_group_order))
         setattr(cls, self.func_local_set_set % subs, partialmethod(self.set_group_order))
+        # Queue rest of work for when model is fully loaded
+        if self.unique_for_fields:
+            cls._meta.apps.lazy_model_operation(
+                self._lazy_contribute_to_class,
+                (cls._meta.app_label, cls._meta.model_name))
+
+    def _lazy_contribute_to_class(self, model):
+        # Sanity check
+        assert(self.model == model)
+        # Get foreign keys in the grouping
+        field_fks = {
+            field.name: field
+            for field_name in self.unique_for_fields
+            for field in (model._meta.get_field(field_name), )
+            if not field.auto_created and field.many_to_one}
+
+        # Extract all associated generic relations
+        generic_fks = {
+            field.name: field
+            for field in model._meta.local_fields
+            if (field.many_to_one and not field.remote_field)             # find generic fks
+            and (field.name in field_fks or field.fk_field in field_fks)  # associated with this grouping
+            and field_fks.pop(field.name, True)                           # and discard their fields
+            and field_fks.pop(field.fk_field, True)}                      # from the field_fks list
+
+        # Queue creation of remote order accessors
+        for field in field_fks.values():
+            model._meta.apps.lazy_model_operation(
+                partial(self.contribute_to_related_class, field=field),
+                make_model_tuple(resolve_relation(model, field.remote_field.model)))
+
+        # TODO Find GenericRelations and add accessors
+
+    def contribute_to_related_class(self, cls, field):
+        subs = {'name': self.name, 'model': self.model.__name__.lower(), 'remote_name': field.name}
+        setattr(cls, self.func_remote_get_set % subs, partialmethod(self.get_group_order, field=field))
+        setattr(cls, self.func_remote_set_set % subs, partialmethod(self.set_group_order, field=field))
+
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
         # Remove default from field definition
