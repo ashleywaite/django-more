@@ -9,20 +9,18 @@ from .mixins import UniqueForFieldsMixin
 
 class OrderByField(UniqueForFieldsMixin, models.IntegerField):
     """ Integer that determine display or sort order of records """
-    # Must always have some unique constraint
-    # Will use unique_for_fields if specified, otherwise unique by default
 
+    # Will use unique_for_fields if specified, otherwise unique by default
     def __init__(self, *args, **kwargs):
         if 'default' in kwargs:
             raise ValueError('OrderByField may not have a default value')
-        if 'unique' in kwargs:
-            raise ValueError('OrderByField may not be explicitly declared unique')
-        super().__init__(*args, unique=True, default=None, **kwargs)
+        # Default None suppresses migration requests to set a default
+        # TODO Add automatically filling to migrations
+        super().__init__(*args, default=None, **kwargs)
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
-        # Remove unique from field definition
-        kwargs.pop('unique', None)
+        # Remove default from field definition
         kwargs.pop('default', None)
         return name, path, args, kwargs
 
