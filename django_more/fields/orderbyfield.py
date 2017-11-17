@@ -14,6 +14,8 @@ from .mixins import UniqueForFieldsMixin
 class OrderByField(UniqueForFieldsMixin, models.IntegerField):
     """ Integer that determine display or sort order of records """
     # Function name templates
+    func_local_next = 'get_next_in_order'
+    func_local_previous = 'get_previous_in_order'
     func_local_get_set = 'get_%(name)s_set'
     func_local_set_set = 'set_%(name)s_set'
 
@@ -30,6 +32,8 @@ class OrderByField(UniqueForFieldsMixin, models.IntegerField):
         # Add order related methods to model
         # Applying partialmethod() to already bound methods will retain self and add the model_instance bound to
         subs = {'name': self.name, 'model': self.model.__name__.lower()}
+        setattr(cls, self.func_local_next % subs, partialmethod(self.get_next_or_previous_in_order, is_next=True))
+        setattr(cls, self.func_local_previous % subs, partialmethod(self.get_next_or_previous_in_order, is_next=False))
         setattr(cls, self.func_local_get_set % subs, partialmethod(self.get_group_order))
         setattr(cls, self.func_local_set_set % subs, partialmethod(self.set_group_order))
     def deconstruct(self):
@@ -37,6 +41,20 @@ class OrderByField(UniqueForFieldsMixin, models.IntegerField):
         # Remove default from field definition
         kwargs.pop('default', None)
         return name, path, args, kwargs
+
+    def get_next_or_previous_in_order(self, model_instance, is_next=True):
+        if not model_instance.pk:
+            raise ValueError("get_next/get_previous cannot be used on unsaved objects.")
+        group_qs = self.get_group(model_instance).order_by(self.attname)
+        # Filter out everything on the wrong side of this record
+        filter_clause = '{field}__{direction}'.format(
+            field=self.attname,
+            direction='gt' if is_next else 'lt')
+        filtered = group_qs.filter(**{filter_clause: getattr(model_instance, self.attname)})
+        # Return the right end based on direction
+        if is_next:
+            return filtered.first()
+        return filtered.last()
 
     def pre_save(self, model_instance, add):
         # Default to the next number larger than existing records, or start from 0
