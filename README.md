@@ -5,63 +5,85 @@ _Currently aimed only at Django 1.11_
 
 
 ## django_more
-
 Extras for Django that do not require any patching and can be used directly.
- * *django_more.storages*
- * *django_more.PartialIndex*
- * *django_more.HashField*
- * *django_more.OrderByField*
 
-
-## django_cte
-
-Patches Django to add CTE based functionality.
-* django_cte.patch_cte()
-
-**Not included in distributions until out of WIP state**  
-_Placing django_cte into Django INSTALLED_APPS will automatically invoke patch_cte()_
+*   *django_more.storages*  
+    Allows defining Django storages in _settings_ and generating the storage classes as needed in _django_more.storages.NAME_.
+*   *django_more.PartialIndex*  
+    Database partial indexes using Django query and `Q()` notation.  
+    Working on postgres, untested elsewhere.
+*   *django_more.HashField*  
+    Field for storing hashes and removing the issues with comparing, generating, and converting hashes.
+*   *django_more.OrderByField*  
+    Field for _order_with_respect_to_ similar functionality, with support for an arbitrary number of fields in the ordering, database constraints, bulk updates, single query creation, and generic keys.
 
 
 ## django_enum
+[django_enum](django_enum/README.md) patches Django to add EnumFields, with enum state information in migrations to allow for consistent migrations compatible with postgres and mysql.
 
-Patches Django to add EnumFields, with enum state information in migrations to allow for consistent migrations compatible with postgres and mysql.
- * django_enum.EnumField
- * django_enum.enum_meta
- * django_enum.patch_enum()
+*   **django_enum.EnumField**  
+    Django field based upon python 3.4 (PEP435) `Enum` with support for database enum fields.
+*   **django_enum.enum_meta**  
+    Decorator to hide _Meta_ classes in standard python `Enum`.
+*   **django_enum.patch_enum()**  
+    Applies patches to Django necessary for this module to work.
 
 _Placing django_enum into Django INSTALLED_APPS will automatically invoke patch_enum()_
 
 
 ## django_types
+[django-types](django_types/README.md) patches Django to add support for custom database types to be used within migrations.
 
-Patches Django to add support for custom database types to be used within migrations.
- * django_types.patch_types()
+*   **django_types.CustomTypeField**  
+    Base implementation for custom types that can be managed within the migration framework.
+*   **django_types.patch_types()**  
+    Applies patches to Django necessary for this module to work.
 
 _To avoid additional dependencies in INSTALLED_APPS, apps adding types requiring this should check for ProjectState.add_type() support, and if not present apply this with patch_types()_
 
 
-## patchy
+## django_cte
+Patches Django to add CTE based functionality.
 
+*   **django_cte.patch_cte()**  
+    Applies patches to Django necessary for this module to work.
+
+**Not included in distributions until out of WIP state**  
+_Placing django_cte into Django INSTALLED_APPS will automatically invoke patch_cte()_
+
+
+## patchy
 A class based monkey patching package used by the other django_more packages to apply their patches in a consistent and safe manner that is hopefully less fragile to Django core changes.
-* patchy.patchy()
-* patchy.super_patchy()
+
+*   **patchy.patchy()**  
+    Creates a class and context manager to apply patches.
+*   **patchy.super_patchy()**  
+    Provides functionality similar to `super()` to functions and methods that have been patched in, allowing them to call the methods they replaced.
 
 
 # Version History
 
-*0.2.0*  
-Added documentation for _django_more_ features in _README_.
-Refactored _django_more.fields_ into sub-module.
-Added:  
- * django_more.OrderByField
+**0.2.1**
+*   Added: `OrderByField` now matches all _order_with_respect_to_ functionality.
+*   Documentation: _django_more_ module, substantial rewrite and expansion of [README](django_more/README.md).
+*   Bugfixes: Migrations interacting badly with OrderByField and defaults.
 
-*0.1.1*  
-Bugfix to include _django_types_ in distribution as necessary for _django_enum_.
+**0.2.0**  
+*   Added: `django_more.OrderByField`.
+*   Bugfix: A bad reference caused `EnumField` to break on cascade.
+*   Bugfix: Defaults to `EnumField` are stringified so that migrations don't break if Enums are relocated.
+*   Refactored: _django_more.fields_ into sub-module.
+*   Documentation: _django_more_ module, added [README](django_more/README.md).  
 
-*0.1.0*  
-Initial release without _django_cte_.  
-Added:  
- * django_enum.EnumField
- * django_more.PartialIndex
- * django_more.HashField
- * django_more.storages
+**0.1.1**  
+*   Bugfix: Include _django_types_ in distribution as necessary for _django_enum_.
+
+**0.1.0**  
+*   Initial release without _django_cte_ module.  
+*   Added: `django_enum.EnumField`.
+*   Added: `django_more.PartialIndex`.
+*   Added: `django_more.HashField`.
+*   Added: `django_more.storages`.
+*   Documentation: _django_enum_ module, added [README](django_enum/README.md).
+*   Documentation: _django_types_ module, added [README](django_types/README.md).
+*   Documentation: _patchy_ module, added [README](patchy/README.md).
