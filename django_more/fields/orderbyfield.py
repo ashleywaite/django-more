@@ -4,7 +4,7 @@ from django.db.models import Subquery
 from django.db.models.functions import Coalesce
 
 from ..expressions import BypassExpression
-from ..mixins import UniqueForFieldsMixin
+from .mixins import UniqueForFieldsMixin
 
 
 class OrderByField(UniqueForFieldsMixin, models.IntegerField):
