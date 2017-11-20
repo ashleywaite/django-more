@@ -14,32 +14,35 @@ _Currently aimed only at Django 1.11_
     Working on postgres, untested elsewhere.
 *   **django_more.HashField**  
     Field for storing hashes and removing the issues with comparing, generating, and converting hashes.
-*   **django_more.OrderByField**  
+*   **django_more.OrderByField**  _(requires django_types)_  
     Field for _order_with_respect_to_ similar functionality, with support for an arbitrary number of fields in the ordering, database constraints, bulk updates, single query creation, and generic keys.
+
+_Placing django_more into Django INSTALLED_APPS will automatically invoke django_types.patch_types() - only necessary for OrderByField makemigrations_
 
 
 ## django_enum
 [django_enum](django_enum/) patches Django to add EnumFields, with enum state information in migrations to allow for consistent migrations compatible with postgres and mysql.
 
-*   **django_enum.EnumField**  
+*   **django_enum.EnumField**  _(requires django_types)_  
     Django field based upon python 3.4 (PEP435) `Enum` with support for database enum fields.
 *   **django_enum.enum_meta**  
     Decorator to hide _Meta_ classes in standard python `Enum`.
 *   **django_enum.patch_enum()**  
     Applies patches to Django necessary for this module to work.
 
-_Placing django_enum into Django INSTALLED_APPS will automatically invoke patch_enum()_
+_Placing django_enum into Django INSTALLED_APPS will automatically invoke patch_enum() and django_types.patch_types()_
 
 
 ## django_types
-[django_types](django_types/) patches Django to add support for custom database types to be used within migrations.
+[django_types](django_types/) patches Django to add support for custom database types to be used within migrations.  
+Not intended to be used directly, but by other reusable apps adding fields that rely on the additional functionality.
 
 *   **django_types.CustomTypeField**  
     Base implementation for custom types that can be managed within the migration framework.
 *   **django_types.patch_types()**  
     Applies patches to Django necessary for this module to work.
 
-_To avoid additional dependencies in INSTALLED_APPS, apps adding types requiring this should check for ProjectState.add_type() support, and if not present apply this with patch_types()_
+_Apps dependent on this should check for ProjectState.add_type() support, and if not present apply this with patch_types()_
 
 
 ## django_cte
@@ -67,6 +70,10 @@ _Placing django_cte into Django INSTALLED_APPS will automatically invoke patch_c
 -----
 
 ## Version History
+
+**0.2.2**
+*   Added: Arbitrary field dependencies via _django_types_.
+*   Bugfix: `OrderByField` uses dependencies to prevent field creation order issues.
 
 **0.2.1**
 *   Added: `OrderByField` now matches all _order_with_respect_to_ functionality.

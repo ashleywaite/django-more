@@ -96,6 +96,8 @@ rock.refresh_from_db()
 assert(rock.order == 11)
 ```
 
+_*NOTE*: OrderByField requires django_types when using makemigrations, but this is not necessary for using the field. ie, In production settings._
+
 #### Class
 *   **OrderByField(unique_for_fields=None, db_constraint=True)**
     *   **unique_for_fields**: List of string field names that should be used similar to _Options.order_with_respect_to_.  
@@ -134,11 +136,11 @@ These can be used the same way as those provided by Django _Options.order_with_r
 [PartialIndex][] is an `Index` implementation allowing for partial indexes to be defined based upon Django filter or Q notation. Used within the _Options.indexes_ option on a model.
 
 It behaves in the same way as [Django field lookups][], taking keyword arguments and `Q` objects as parameters to generate the clauses for the database index.  
-There's no equivalent of `QuerySet.exclude()` and other filtering functions, but most of these can be achieved with [Django Q lookups][], such as `~Q()` notation to exclude. 
+There's no equivalent of `QuerySet.exclude()` and other filtering functions, but most of these can be achieved with [Django Q lookups][], such as `~Q()` notation to exclude.
 
 #### Class
 *   **PartialIndex(\*args, fields=[], name=None, \*\*kwargs)**  
-    Very similar behaviour to 
+    Very similar behaviour to `Index` and `QuerySet`.
     *   **args**: `Q` objects to restrict the index generated, same as for `QuerySet.filter()`.
     *   **fields**: List of fields to include in the index.
     *   **name**: Name to use when creating the index on the database.  
