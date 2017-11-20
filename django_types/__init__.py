@@ -15,6 +15,8 @@ def patch_types():
 
     # Patch migration classes to statefully apply types
     with patchy('django.db', 'django_types.patches') as p:
+        p.cls('migrations.autodetector.MigrationAutodetector').auto(allow={'_get_dependencies_for_foreign_key'})
+
         p.cls('migrations.state.ProjectState').auto(allow={'apps'})
         p.cls('migrations.state.StateApps').auto()
 

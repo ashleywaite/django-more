@@ -12,6 +12,25 @@ class StateApps:
         super_patchy(*args, **kwargs)
 
 
+# Make fields able to declare arbitrary dependencies
+# NOTE: At present fields must also trick MigrationAutodetector into treating as a related field
+#  Trivially this is done with: field.remote_field = field
+# CORE: Ought to be changed to a _get_dependencies_for_field(field) and has_dependencies
+#  Rather than checking for specific attributes of a field, check has_dependencies to defer fields
+#  Then the default foreign key logic implemented on RelatedField and inherited by ForeignKey
+#  OneToOne logic on the OneToOneField, etc
+#  Rather than hardcoded special treatment of ForeignKeys which blocks flexibly interacting with migrations
+class MigrationAutodetector:
+    # Dependencies is a list of tuples of:
+    #  (app_label, object_name, field_name, bool(created/deleted))
+    def _get_dependencies_for_foreign_key(self, field):
+        # If field has specialised dependencies use those
+        if hasattr(field, 'get_dependencies'):
+            return field.get_dependencies()
+        # Otherwise use default behaviour
+        return super_patchy(field)
+
+
 class ProjectState:
     def __init__(self, *args, **kwargs):
         super_patchy(*args, **kwargs)
