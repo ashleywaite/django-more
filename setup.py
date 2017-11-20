@@ -1,5 +1,11 @@
 from setuptools import setup
-import pypandoc
+
+
+try:
+    import pypandoc
+    long_description = pypandoc.convert('README.md', 'rst')
+except(IOError, ImportError):
+    long_description = open('README.md').read()
 
 test_deps = [
     'psycopg2',
@@ -15,7 +21,7 @@ setup(
     author='Ashley Waite',
     author_email='ashley.c.waite@gmail.com',
     description='Django with more',
-    long_description=pypandoc.convert('README.md', 'rst'),
+    long_description=long_description,
     url='https://github.com/ashleywaite/django-more',
     packages=[
         'patchy',
