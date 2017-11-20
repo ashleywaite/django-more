@@ -6,6 +6,7 @@ from django.utils.functional import cached_property
 class UniqueForFieldsMixin:
     """ Mixin first to a Field to add a unique_for_fields field option """
     unique_for_fields = None
+    db_constraint = None
 
     def __init__(self, unique_for_fields=None, db_constraint=True, *args, **kwargs):
         if 'unique' in kwargs:
@@ -14,14 +15,15 @@ class UniqueForFieldsMixin:
             self.unique_for_fields = tuple(unique_for_fields)
         else:
             kwargs['unique'] = True
-        self.db_constraint = db_constraint
+        # Use different internal name to dodge schema_editor checks that make fk constraints
+        self.unique_db_constraint = db_constraint
         super().__init__(*args, **kwargs)
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
         if self.unique_for_fields:
             kwargs['unique_for_fields'] = self.unique_for_fields
-        kwargs['db_constraint'] = self.db_constraint
+        kwargs['db_constraint'] = self.unique_db_constraint
         # Remove unique from field definition
         kwargs.pop('unique', None)
         return name, path, args, kwargs
@@ -30,7 +32,7 @@ class UniqueForFieldsMixin:
         super().contribute_to_class(cls, *args, **kwargs)
 
         # Add any necessary unique_together index to the model
-        if self.unique_for_fields and self.db_constraint:
+        if self.unique_for_fields and self.unique_db_constraint:
             # Alter only original_attr to fake being a declared unique_together
             # Cannot modify cls._meta.unique_together as it breaks state consistency for migrations
             ut = set((self.unique_together, )).union(normalize_together(cls._meta.original_attrs.get('unique_together')))
