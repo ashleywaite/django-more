@@ -13,7 +13,7 @@ from ..expressions import BypassExpression
 from .mixins import UniqueForFieldsMixin
 
 
-class OrderByField(UniqueForFieldsMixin, models.IntegerField):
+class OrderByField(UniqueForFieldsMixin, models.Field):
     """ Integer that determine display or sort order of records """
     # Function name templates
     func_local_next = 'get_next_in_order'
@@ -77,6 +77,9 @@ class OrderByField(UniqueForFieldsMixin, models.IntegerField):
         subs = {'name': self.name, 'model': self.model.__name__.lower(), 'remote_name': field.name}
         setattr(cls, self.func_remote_get_set % subs, partialmethod(self.get_group_order, field=field))
         setattr(cls, self.func_remote_set_set % subs, partialmethod(self.set_group_order, field=field))
+
+    def get_internal_type(self):
+        return "PositiveIntegerField"
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
