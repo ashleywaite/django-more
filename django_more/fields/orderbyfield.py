@@ -31,8 +31,17 @@ class OrderByField(UniqueForFieldsMixin, models.Field):
         # TODO Add automatically filling to migrations
         super().__init__(*args, default=None, **kwargs)
 
+    def get_dependencies(self):
+        # Dependencies is a list of tuples of:
+        #  (app_label, object_name, field_name, bool(created/deleted))
+        return [
+            (self.model._meta.app_label, self.model._meta.object_name, field.name, True)
+            for field_name in self.unique_for_fields
+            for field in (self.model._meta.get_field(field_name), )]
+
     def contribute_to_class(self, cls, *args, **kwargs):
         super().contribute_to_class(cls, *args, **kwargs)
+
         # Add order related methods to model
         # Applying partialmethod() to already bound methods will retain self and add the model_instance bound to
         subs = {'name': self.name, 'model': self.model.__name__.lower()}
@@ -40,8 +49,11 @@ class OrderByField(UniqueForFieldsMixin, models.Field):
         setattr(cls, self.func_local_previous % subs, partialmethod(self.get_next_or_previous_in_order, is_next=False))
         setattr(cls, self.func_local_get_set % subs, partialmethod(self.get_group_order))
         setattr(cls, self.func_local_set_set % subs, partialmethod(self.set_group_order))
-        # Queue rest of work for when model is fully loaded
         if self.unique_for_fields:
+            # Hack to make this field noticed as related to others by AutoMigration
+            self.remote_field = self
+            self.parent_link = False
+            # Queue rest of work for when model is fully loaded
             cls._meta.apps.lazy_model_operation(
                 self._lazy_contribute_to_class,
                 (cls._meta.app_label, cls._meta.model_name))
