@@ -1,6 +1,6 @@
 # django_types
 
-Provides a base implemention for custom database types in Django 1.11+.  
+Provides a base implementation for custom database types in Django 1.11+.  
 It tracks data types within the migration state and migration apps so that fields relying on these can more easily hook into auto-migration, and have stateful field instances appropriate for prior states of the project.
 
 
@@ -17,11 +17,6 @@ Where not provided, the default is to generate a type name based upon the app th
 _contribute_to_class()_ provides the hooks to regain previous states during migration and make the field actually operable in that state, based on the type_name.
 
 _clone()_ will copy the type_def where it exists, so that stateful fields remain stateful through model/field cloning, especially during migration.
-
-
-## DBType
-
-Also used is an overloaded _str_ class that allows for the use of parametised values in places where Django doesn't otherwise support them, such as in the db_type. (ie, this is necessary for enum usage on mysql)
 
 
 ## Django patches
@@ -64,3 +59,23 @@ Patches to make field based dependencies work.
 *   **generate_created_models()**: Changed to use field based dependencies logic.
 *   **\_generate_added_field()**: Changed to use field based dependencies logic.
 *   **\_generate_altered_foo_together()**: Changed to use field based dependencies logic.
+
+
+# Utility Classes
+Various classes necessary for exposed functionality.
+
+
+## DBType
+An overloaded _str_ class that allows for the use of parametised values in places where Django doesn't otherwise support them, such as in the db_type. (ie, this is necessary for enum usage on mysql)
+
+
+## dependency_tuple
+A `namedtuple` that represents the required fields for migration dependencies.
+
+
+## find_fields(state, db_type, field_type)
+Convenience function to scan an entire _state_ for fields of the specified _field_type_ and _db_type_, returning a list of _field_info_ tuples.
+
+
+## field_info
+A `namedtuple` that represents all the information about a field that should be necessary to generate migration operations for it.
