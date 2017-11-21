@@ -1,8 +1,11 @@
 """ Container classes for methods and attributes to be patched into django """
+from django.db import models
+from django.db.migrations.state import StateApps as DjangoStateApps
+from django.db.models.fields.related import RelatedField as DjangoRelatedField
 from django.utils.functional import cached_property
 # Project imports
 from patchy import super_patchy
-from django.db.migrations.state import StateApps as DjangoStateApps
+from .utils import dependency_tuple
 
 
 # Make types available via StateApps (not regular Apps)
@@ -10,6 +13,50 @@ class StateApps:
     def __init__(self, *args, db_types=None, **kwargs):
         self.db_types = db_types or {}
         super_patchy(*args, **kwargs)
+
+
+class Field:
+    # Ensure all fields have a dependencies flag
+    has_dependencies = False
+
+    @cached_property
+    def dependencies(self):
+        return self.get_dependencies()
+
+    def get_dependencies(self):
+        return []
+
+
+class RelatedField(models.Field):
+    has_dependencies = True
+
+    def get_dependencies(self):
+        # Generate the default dependencies for a related field
+        dependencies = super(DjangoRelatedField, self).get_dependencies()
+
+        if self.remote_field:
+            # Account for FKs to swappable models
+            swappable_setting = getattr(self, 'swappable_setting', None)
+            if swappable_setting is not None:
+                dep_app_label = "__setting__"
+                dep_object_name = swappable_setting
+            else:
+                dep_app_label = self.remote_field.model._meta.app_label
+                dep_object_name = self.remote_field.model._meta.object_name
+            # Depend on the model that this refers to
+            dependencies.append(dependency_tuple(
+                app_label=dep_app_label,
+                object_name=dep_object_name,
+                field=None,
+                created=True))
+            # And any manually declared through model
+            if getattr(self.remote_field, 'through', None) and not self.remote_field.through._meta.auto_created:
+                dependencies.append(dependency_tuple(
+                    app_label=self.remote_field.through._meta.app_label,
+                    object_name=self.remote_field.through._meta.object_name,
+                    field=None,
+                    created=True))
+        return dependencies
 
 
 # Make fields able to declare arbitrary dependencies

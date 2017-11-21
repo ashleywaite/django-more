@@ -19,5 +19,11 @@ def patch_types():
         p.cls('migrations.state.ProjectState').auto(allow={'apps'})
         p.cls('migrations.state.StateApps').auto()
 
-        # Patch backend classes to allow parametised db_types
-        p.cls('backends.base.schema.BaseDatabaseSchemaEditor').auto(allow={'_alter_column_type_sql'})
+    # Patch fields to provide default dependency information
+    with patchy('django.db.models', 'django_types.patches') as p:
+        p.cls('Field').auto(allow={'dependencies'})
+        p.cls('fields.related.RelatedField').auto()
+
+    # Patch backend classes to allow parametised db_types
+    with patchy('django.db.backends', 'django_types.patches') as p:
+        p.cls('base.schema.BaseDatabaseSchemaEditor').auto(allow={'_alter_column_type_sql'})
