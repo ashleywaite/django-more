@@ -12,6 +12,10 @@ __all__ = ['patchy', 'super_patchy']
 logger = logging.getLogger(__name__)
 
 
+class ResolveError(ImportError):
+    pass
+
+
 def patchy(target, source=None):
     """ If source is not supplied, auto updates cannot be applied """
     if isinstance(target, str):
@@ -49,22 +53,28 @@ def resolve(name, package=None):
         package = import_module(package)
     package_name = package.__name__ if package else None
 
-    with suppress(AttributeError, ImportError):
+    try:
         return import_module('{r}{n}'.format(r='.' if package else '', n=name), package_name)
+    except ImportError as err:
+        # Reraise any suspicious errors from within packages
+        if not err.msg.startswith('No module') or name not in err.msg:
+            raise
 
-    with suppress(ImportError):
+    try:
         if '.' in name:
             mod, name = name.rsplit('.', maxsplit=1)
             package = import_module('{r}{n}'.format(r='.' if package else '', n=mod), package_name)
         elif not isinstance(package, ModuleType):
             package = import_module(package)
 
-        with suppress(AttributeError):
-            return getattr(package, name)
-
-    raise ImportError('{name} is not a valid class or module name{within}'.format(
-        name=name,
-        within=', within {}'.format(package.__name__) if package else ''))
+        return getattr(package, name)
+    except (ImportError, AttributeError) as err:
+        raise ResolveError(
+            '{name} is not a valid class or module name{within}'.format(
+                name=name,
+                within=' within {}'.format(package.__name__) if package else ''),
+            name=name,
+            path=package.__name__ if package else '') from err
 
 
 class PatchyRecords(dict):
