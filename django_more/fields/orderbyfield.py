@@ -9,6 +9,8 @@ from django.db.models import When
 from django.db.models.functions import Coalesce
 from django.db.models.fields.related import resolve_relation, make_model_tuple
 
+from django_types.utils import dependency_tuple
+
 from ..expressions import BypassExpression
 from .mixins import UniqueForFieldsMixin
 
@@ -32,10 +34,12 @@ class OrderByField(UniqueForFieldsMixin, models.Field):
         super().__init__(*args, default=None, **kwargs)
 
     def get_dependencies(self):
-        # Dependencies is a list of tuples of:
-        #  (app_label, object_name, field_name, bool(created/deleted))
         return [
-            (self.model._meta.app_label, self.model._meta.object_name, field.name, True)
+            dependency_tuple(
+                app_label=self.model._meta.app_label,
+                object_name=self.model._meta.object_name,
+                field=field.name,
+                created=True)
             for field_name in self.unique_for_fields
             for field in (self.model._meta.get_field(field_name), )]
 
@@ -50,9 +54,8 @@ class OrderByField(UniqueForFieldsMixin, models.Field):
         setattr(cls, self.func_local_get_set % subs, partialmethod(self.get_group_order))
         setattr(cls, self.func_local_set_set % subs, partialmethod(self.set_group_order))
         if self.unique_for_fields:
-            # Hack to make this field noticed as related to others by AutoMigration
-            self.remote_field = self
-            self.parent_link = False
+            # Declare that this field has dependencies
+            self.has_dependencies = True
             # Queue rest of work for when model is fully loaded
             cls._meta.apps.lazy_model_operation(
                 self._lazy_contribute_to_class,
