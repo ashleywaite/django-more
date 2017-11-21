@@ -2,7 +2,6 @@
 import logging
 # Project imports
 from patchy import patchy
-from .operations import *
 from .fields import CustomTypeField
 
 

@@ -7,7 +7,7 @@ from django.db.models import sql
 from django.db.models.deletion import Collector
 from django.utils import six
 
-from django_types import CustomTypeOperation
+from django_types.operations import CustomTypeOperation
 from .fields import EnumField
 
 """
