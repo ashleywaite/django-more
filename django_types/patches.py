@@ -68,8 +68,6 @@ class RelatedField(models.Field):
 
 
 # Make fields able to declare arbitrary dependencies
-# NOTE: At present fields must also trick MigrationAutodetector into treating as a related field
-#  Trivially this is done with: field.remote_field = field
 class MigrationAutodetector:
 
     def generate_created_models(self):

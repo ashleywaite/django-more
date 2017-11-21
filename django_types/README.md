@@ -29,11 +29,38 @@ Also used is an overloaded _str_ class that allows for the use of parametised va
 Changes to Django that are necessary are applied by _patch_types()_
 This should be called by any app that requires custom types.
 
-**ProjectState** (django.db.migrations.state.ProjectState)  
+### Custom types
+Patches to make custom types work.
+
+**ProjectState** _(django.db.migrations.state.ProjectState)_  
 Modified to store custom types that may be relevant to the database, and ensure that apps objects based on this state also have them available.
+*   **\_\_init\_\_( \* )**: Also initialises _db_types_ dict.
+*   **apps**: Will pass through _db_types_ when creating `StateApps`.
+*   **add_type(self, type_name, type_def, app_label)**: Add a new type to the local _db_types_ and if _apps_ exists to there too.
+*   **remove_type(self, type_name)**: Remove a type from _db_types_ and if _apps_ exists from there too.
+*   **clone(self)**: Also clones _db_types_ and _apps.db_types__.
 
-**StateApps** (django.db.migrations.state.StateApps)  
-Modified to allow for db_types to be provided on _\_\_init\_\__ so that fields created will have access to type implementation classes.
+**StateApps** _(django.db.migrations.state.StateApps)_  
+*   **\_\_init\_\_( \* )**: Accepts _db_types_ keyword argument.
 
-**BaseDatabaseSchemaEditor** (django.db.backends.base.schema.BaseDatabaseSchemaEditor)  
-Modified _\_alter_column_type_sql()_ and _coloum_sql()_ to support parametised types.
+**BaseDatabaseSchemaEditor** _(django.db.backends.base.schema.BaseDatabaseSchemaEditor)_
+*   **column_sql_paramatized(self, col_type)**: Convenience method to turn any valid _col_type_ into an `sql, params` pair.
+*   **\_alter_column_type_sql()**: Changed to support parametised DBTypes.
+*   **\_column_sql()**: Changed to support parametised DBTypes.
+
+### Field dependencies
+Patches to make field based dependencies work.
+
+**Field** _(django.db.models.Field)_
+*   **has_dependencies**: New flag that defaults to False.  
+*   **dependencies**: _cached_property_ of what is given by _get_dependencies()_.
+*   **get_dependencies()**: Skeleton that returns an empty list, so inherited classes can always use `super()`.
+
+**RelatedField** _(django.db.models.fields.related.RelatedField)_
+*   **has_dependencies**: Flag set to True.
+*   **get_dependencies()**: will return the list of dependencies this field has, performing the same function as `MigrationAutodetector._get_dependencies_for_foreign_key(field)` would for any existing foreign key types.
+
+**MigrationAutodetector** _(django.db.migrations.autodetector.MigrationAutodetector)_
+*   **generate_created_models()**: Changed to use field based dependencies logic.
+*   **\_generate_added_field()**: Changed to use field based dependencies logic.
+*   **\_generate_altered_foo_together()**: Changed to use field based dependencies logic.
