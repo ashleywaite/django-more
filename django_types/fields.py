@@ -6,30 +6,7 @@ from django.utils.module_loading import import_string
 from django.utils.datastructures import DictWrapper
 from django.apps import apps
 
-__all__ = ['DBType', 'CustomTypeField']
-
-
-class DBType(str):
-    """ Create a db_type string that can represent paramatised values """
-    params = []
-    db_type = None
-
-    def __new__(cls, value, params=None, *args, **kwargs):
-        if params:
-            self = super().__new__(cls, cls.render(value, params))
-            self.params = params
-        else:
-            self = super().__new__(cls, value)
-        self.db_type = value
-        return self
-
-    @property
-    def paramatized(self):
-        return self.db_type, self.params
-
-    @staticmethod
-    def render(db_type, params):
-        return db_type % tuple(params)
+__all__ = ['CustomTypeField']
 
 
 class CustomTypeField(models.Field):

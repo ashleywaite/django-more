@@ -2,8 +2,8 @@
 import logging
 # Project imports
 from patchy import patchy
-from .fields import *
 from .operations import *
+from .fields import CustomTypeField
 
 
 logger = logging.getLogger(__name__)

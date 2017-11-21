@@ -3,7 +3,8 @@ from enum import Enum
 
 from django.core.exceptions import ValidationError
 from django.db import models
-from django_types import CustomTypeField, DBType
+from django_types import CustomTypeField
+from django_types.utils import DBType
 
 __all__ = ['EnumField', 'enum_meta']
 

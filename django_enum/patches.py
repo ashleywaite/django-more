@@ -3,7 +3,7 @@ from enum import Enum
 # Framework imports
 from django.db import models
 # Project imports
-from django_types import find_fields
+from django_types.utils import find_fields
 from patchy import super_patchy
 from .operations import CreateEnum, RemoveEnum, RenameEnum, AlterEnum, enum_state
 from .fields import EnumField

@@ -1,25 +1,10 @@
-
-from collections import namedtuple
 # Framework imports
 from django.db.migrations.operations.base import Operation
 # Project imports
 from .fields import CustomTypeField
+from .utils import find_fields
 
-__all__ = ['CustomTypeOperation', 'find_fields']
-
-
-field_info = namedtuple('fielddetail', ['model_state', 'model_app_label', 'model_name', 'field', 'field_name', 'field_index'])
-
-
-def find_fields(state, db_type=None, field_type=None):
-    field_type = field_type or CustomTypeField
-    # Scan state for custom types in use
-    return (
-        field_info(model_state, model_app_label, model_name, field, field_name, field_index)
-        for (model_app_label, model_name), model_state in state.models.items()
-        for field_index, (field_name, field) in enumerate(model_state.fields)
-        if isinstance(field, field_type)
-        and (field.type_name == db_type or not db_type))
+__all__ = ['CustomTypeOperation']
 
 
 class CustomTypeOperation(Operation):
