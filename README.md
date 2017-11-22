@@ -71,6 +71,10 @@ _Placing django_cte into Django INSTALLED_APPS will automatically invoke patch_c
 
 ## Version History
 
+**0.2.3**
+*   Bugfix: _patchy_ exposes exceptions more correctly.
+*   Added: _django_types_ patches migrations to use field based dependencies and moves default functionality onto `Field` and `RelatedField`.
+
 **0.2.2**
 *   Added: Arbitrary field dependencies via _django_types_.
 *   Bugfix: `OrderByField` uses dependencies to prevent field creation order issues.
