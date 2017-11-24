@@ -5,6 +5,7 @@ import inspect
 from types import MethodType, ModuleType
 from collections import abc
 from importlib import import_module
+from importlib.util import resolve_name
 from contextlib import suppress
 
 __all__ = ['patchy', 'super_patchy']
@@ -12,7 +13,12 @@ __all__ = ['patchy', 'super_patchy']
 logger = logging.getLogger(__name__)
 
 
-class ResolveError(ImportError):
+class ResolveError(Exception):
+    """ Used to indicate terminal exception during resolve """
+    pass
+
+
+class NotFoundError(ResolveError, ImportError):
     pass
 
 
@@ -46,35 +52,46 @@ def super_patchy(*args, do_call=True, **kwargs):
     return old_func
 
 
+def resolve_exposing(name):
+    """ Attempt an import but reraise any error other than module not found as terminal to resolving """
+    try:
+        return import_module(name)
+    except ImportError as err:
+        # Pass any non-suspicious errors on
+        if err.msg.endswith('is not a package') or err.msg.startswith('No module') and name in err.msg:
+            raise
+        # Reraise any suspicious errors as terminal - resolve fails
+        raise ResolveError('Error importing module {n}'.format(n=name)) from err
+
+
 def resolve(name, package=None):
     """ Turn a dotted name into a module or class reference """
-
     if isinstance(package, str):
-        package = import_module(package)
-    package_name = package.__name__ if package else None
+        package = resolve_exposing(package)
+
+    if package:
+        name = resolve_name('.{}'.format(name), package.__name__)
 
     try:
-        return import_module('{r}{n}'.format(r='.' if package else '', n=name), package_name)
+        # Try to get a module
+        return resolve_exposing(name)
     except ImportError as err:
-        # Reraise any suspicious errors from within packages
-        if not err.msg.startswith('No module') or name not in err.msg:
-            raise
+        if '.' not in name:
+            raise NotFoundError('{n} is not a valid module name'.format(n=name)) from err
 
     try:
-        if '.' in name:
-            mod, name = name.rsplit('.', maxsplit=1)
-            package = import_module('{r}{n}'.format(r='.' if package else '', n=mod), package_name)
-        elif not isinstance(package, ModuleType):
-            package = import_module(package)
-
-        return getattr(package, name)
-    except (ImportError, AttributeError) as err:
-        raise ResolveError(
-            '{name} is not a valid class or module name{within}'.format(
-                name=name,
-                within=' within {}'.format(package.__name__) if package else ''),
-            name=name,
-            path=package.__name__ if package else '') from err
+        # Try to get an attribute of a module
+        mod, attr = name.rsplit('.', maxsplit=1)
+        package = resolve_exposing(mod)
+        cls = getattr(package, attr)
+        assert(isinstance(cls, type))
+        return cls
+    except ImportError as err:
+        raise NotFoundError('{n} is not a valid class or module name'.format(n=name)) from err
+    except AttributeError as err:
+        raise NotFoundError('{a} does not exist within {m}'.format(a=attr, m=mod)) from err
+    except AssertionError as err:
+        raise ResolveError('{a} in {m} is not a valid class'.format(a=attr, m=mod)) from err
 
 
 class PatchyRecords(dict):
