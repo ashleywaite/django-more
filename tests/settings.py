@@ -55,7 +55,7 @@ DATABASE_ENGINES = {
 
 # Use database dependant on ENV
 DATABASES = {
-    'default': DATABASE_ENGINES[os.getenv('USING_DB_ALIAS')]
+    'default': DATABASE_ENGINES[os.getenv('USING_DB_ALIAS', 'sqlite')]
 }
 
 LOGGING = {
