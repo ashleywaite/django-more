@@ -187,8 +187,8 @@ class AlterEnum(EnumOperation):
 
     def __init__(self, db_type, add_values=None, remove_values=None, on_delete=models.PROTECT):
         self.db_type = db_type
-        self.add_values = set(add_values)
-        self.remove_values = set(remove_values)
+        self.add_values = set(add_values or ())
+        self.remove_values = set(remove_values or ())
         self.on_delete = on_delete
 
     def describe(self):
