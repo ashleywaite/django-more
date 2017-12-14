@@ -71,6 +71,13 @@ _Placing django_cte into Django INSTALLED_APPS will automatically invoke patch_c
 
 ## Version History
 
+**0.2.5**
+*  Bugfix: `EnumField` now serialises to text value of Enum member
+*  Bugfix: `EnumField` now accepts strings that represent an Enum member as valid values
+
+**0.2.4**
+*  Bugfix: `EnumField` alter operations with a missing argument now correctly accepted
+
 **0.2.3**
 *   Bugfix: _patchy_ exposes exceptions more correctly.
 *   Added: _django_types_ patches migrations to use field based dependencies and moves default functionality onto `Field` and `RelatedField`.
