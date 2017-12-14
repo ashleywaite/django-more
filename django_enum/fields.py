@@ -83,7 +83,7 @@ class EnumField(CustomTypeField):
                 for em in self.type_def:
                     if str(value).lower() == em.value.lower():
                         return em
-            # Check for a serialised Enum member
+            # Check for a Enum member string representation
             if value.startswith(self.type_def.__name__ + '.'):
                 with suppress(ValueError):
                     return self.type_def[value[len(self.type_def.__name__) + 1:]]
@@ -97,6 +97,11 @@ class EnumField(CustomTypeField):
         if not isinstance(value, self.type_def):
             value = self.to_python(value)
         return value.value
+
+    def value_to_string(self, obj):
+        """ Serialise to text value as represented in the Enum member or database """
+        value = self.value_from_object(obj)
+        return self.get_prep_value(value)
 
     def db_type_parameters(self, connection):
         paras = super().db_type_parameters(connection)
