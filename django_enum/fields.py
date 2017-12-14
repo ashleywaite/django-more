@@ -83,6 +83,10 @@ class EnumField(CustomTypeField):
                 for em in self.type_def:
                     if str(value).lower() == em.value.lower():
                         return em
+            # Check for a serialised Enum member
+            if value.startswith(self.type_def.__name__ + '.'):
+                with suppress(ValueError):
+                    return self.type_def[value[len(self.type_def.__name__) + 1:]]
             raise ValidationError("Invalid value '{}' not in enumeration {}".format(
                 value, [em.value for em in self.type_def]))
         raise ValidationError("Invalid type '{}' is not an enum member or string".format(type(value).__name__))
