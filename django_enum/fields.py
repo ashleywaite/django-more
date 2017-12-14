@@ -18,6 +18,13 @@ def enum_meta(meta):
 
 
 class EnumField(CustomTypeField):
+    """ Field based on a python PEP435 Enum
+        EnumField takes an enum as is argument, and value can be set using any of the following:
+        * Enum member of the correct Enum class
+        * String matching an Enum member value
+        * String representing the Enum member _'[EnumClass].[AttributeName]'_
+        * String matching an Enum member value when both are lower cased - if case_sensitive is False
+    """
     description = 'Enumeration field using python PEP435 and database implementations'
     case_sensitive = None
     manual_choices = False
