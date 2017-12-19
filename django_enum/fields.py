@@ -56,10 +56,10 @@ class EnumField(CustomTypeField):
         # Allow flat list of enum members for choices
         if self.manual_choices:
             self.choices = [
-                (choice, choice.value) if isinstance(choice, self.type_def) else choice
+                (str(choice), choice.value) if isinstance(choice, self.type_def) else choice
                 for choice in self.manual_choices]
         else:
-            self.choices = [(em, em.value) for em in self.type_def]
+            self.choices = [(str(em), em.value) for em in self.type_def]
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
