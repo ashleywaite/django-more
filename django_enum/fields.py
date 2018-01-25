@@ -128,3 +128,34 @@ class EnumField(CustomTypeField):
         return DBType(
             type_string,
             values)
+
+    def flat_choices_iter(self, choices=None):
+        """ Iterator of valid choices """
+        choices = choices or self.choices
+        for option_key, option_value in choices:
+            if isinstance(option_value, (list, tuple)):
+                yield from flat_choices_iter(option_value)
+            else:
+                yield option_key, option_value
+
+    def validate(self, value, instance):
+        if not self.editable:
+            return
+
+        if self.manual_choices:
+            # If restricted choices, check against them
+            if any(str(value) == option for option, v in self.flat_choices_iter()):
+                return
+        elif isinstance(value, self.type_def):
+            return
+
+        if value is None and not self.null:
+            raise ValidationError(self.error_messages['null'], code='null')
+
+        if not self.blank and value in self.empty_values:
+            raise ValidationError(self.error_messages['blank'], code='blank')
+
+        raise ValidationError(
+            self.error_messages['invalid_choice'],
+            code='invalid_choice',
+            params={'value': value})
