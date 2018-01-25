@@ -1,28 +1,13 @@
 """ Run tests related to django_enum.EnumField """
-from enum import Enum
 # Framework imports
-from django.core.exceptions import ValidationError
 from django.db.models.fields import BLANK_CHOICE_DASH
-from django.test import TestCase
 from django_enum import EnumField
 from .models import TestEnum, WrongEnum, MetaEnum
+from . import FieldTestCase
 
 
-class EnumFieldTest(TestCase):
+class EnumFieldTest(FieldTestCase):
     multi_db = True
-
-    def assertFieldValue(self, fieldclass, valid, invalid, field_args=None, field_kwargs=None):
-        field_args = field_args or []
-        field_kwargs = field_kwargs or {}
-        field = fieldclass(*field_args, **field_kwargs)
-
-        for input, output in valid.items():
-            self.assertEqual(field.clean(input, None), output)
-
-        for input, errors in invalid.items():
-            with self.assertRaisesRegex(ValidationError, errors) as context_manager:
-                field.clean(input, None)
-
 
     def test_create(self):
         field = EnumField(TestEnum)
@@ -30,8 +15,6 @@ class EnumFieldTest(TestCase):
         self.assertEqual(field.type_def, TestEnum)
 
     def test_assignment(self):
-        field = EnumField(TestEnum)
-
         self.assertFieldValue(
             fieldclass=EnumField,
             valid={
@@ -57,8 +40,6 @@ class EnumFieldTest(TestCase):
             field_args=[TestEnum])
 
     def test_meta_not_member(self):
-        field = EnumField(MetaEnum)
-
         self.assertEqual(
             dict(MetaEnum.__members__),
             {
@@ -85,12 +66,12 @@ class EnumFieldTest(TestCase):
     def test_default_choices(self):
         field = EnumField(TestEnum)
         choices = field.get_choices(blank_choice=BLANK_CHOICE_DASH)
-        expected = BLANK_CHOICE_DASH + [(em, em.value) for em in TestEnum]
+        expected = BLANK_CHOICE_DASH + [(str(em), em.value) for em in TestEnum]
         self.assertEqual(choices, expected)
 
     def test_manual_choices(self):
         members = [TestEnum.VAL1, TestEnum.VAL2]
         field = EnumField(TestEnum, choices=members)
         choices = field.get_choices(blank_choice=BLANK_CHOICE_DASH)
-        expected = BLANK_CHOICE_DASH + [(em, em.value) for em in members]
+        expected = BLANK_CHOICE_DASH + [(str(em), em.value) for em in members]
         self.assertEqual(choices, expected)
