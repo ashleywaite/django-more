@@ -2,6 +2,7 @@
 from enum import Enum
 from django.db import models
 from django_enum import EnumField, enum_meta
+from django_more.fields import NullCharField
 
 
 class TestEnum(Enum):
@@ -20,6 +21,7 @@ class MetaEnum(Enum):
     VAL1 = 'First meta value'
     VAL2 = 'So meta'
     VAL3 = 'Third value is the best'
+
     @enum_meta
     class Meta:
         db_type = 'test_enum_meta'
@@ -28,3 +30,7 @@ class MetaEnum(Enum):
 class FirstModel(models.Model):
     test_enum = EnumField(TestEnum)
     meta_enum = EnumField(MetaEnum)
+
+
+class NullCharModel(models.Model):
+    test_field = NullCharField(max_length=50)

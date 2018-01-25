@@ -8,6 +8,7 @@ INSTALLED_APPS = (
     'django.contrib.auth',
     'django.contrib.admin',
     'django_enum',
+    'django_more',
     'tests',
 )
 
