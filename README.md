@@ -71,6 +71,10 @@ _Placing django_cte into Django INSTALLED_APPS will automatically invoke patch_c
 
 ## Version History
 
+**0.2.6**
+*  Bugfix: `EnumField` forces choice values to string so behaviour is unambiguous and works with Django Rest Framework
+*  Added: `NullCharField` that treats and saves blank values as nulls
+
 **0.2.5**
 *  Bugfix: `EnumField` now serialises to text value of Enum member
 *  Bugfix: `EnumField` now accepts strings that represent an Enum member as valid values

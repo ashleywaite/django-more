@@ -17,7 +17,7 @@ extras = {
 
 setup(
     name='django-more',
-    version='0.2.5',
+    version='0.2.6',
     author='Ashley Waite',
     author_email='ashley.c.waite@gmail.com',
     description='Django with more',
